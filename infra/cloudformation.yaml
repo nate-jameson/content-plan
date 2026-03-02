@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Content Review Dashboard - Aurora Serverless v2 + S3
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-156a526d
+    Description: VPC for the Aurora cluster
+  
+  DBMasterUsername:
+    Type: String
+    Default: dashboard_admin
+    Description: Master username for the database
+  
+  DBMasterPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 12
+    Description: Master password for the database
+  
+  DBName:
+    Type: String
+    Default: content_review
+    Description: Database name
+
+Resources:
+  # --- Security Group ---
+  AuroraSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Content Review Dashboard - Aurora Serverless v2
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # Allow PostgreSQL from anywhere (Vercel serverless needs this)
+        # In production, restrict to Vercel's IP ranges
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: content-review-aurora-sg
+        - Key: Project
+          Value: content-review-dashboard
+
+  # --- DB Subnet Group ---
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets for Content Review Aurora cluster
+      SubnetIds: !Split
+        - ","
+        - !GetAtt SubnetLookup.SubnetIds
+      Tags:
+        - Key: Project
+          Value: content-review-dashboard
+
+  # We'll handle subnet lookup via CLI instead since CFN can't auto-discover
+  # Removing the custom resource - we'll create subnet group via CLI
+
+  # --- Aurora Serverless v2 Cluster ---
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      Engine: aurora-postgresql
+      EngineVersion: '16.4'
+      DatabaseName: !Ref DBName
+      MasterUsername: !Ref DBMasterUsername
+      MasterUserPassword: !Ref DBMasterPassword
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: 0.5
+        MaxCapacity: 4
+      VpcSecurityGroupIds:
+        - !GetAtt AuroraSecurityGroup.GroupId
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      DeletionProtection: false
+      Tags:
+        - Key: Project
+          Value: content-review-dashboard
+
+  AuroraInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref AuroraCluster
+      DBInstanceClass: db.serverless
+      Engine: aurora-postgresql
+      PubliclyAccessible: true
+      Tags:
+        - Key: Project
+          Value: content-review-dashboard
+
+  # --- S3 Bucket for PDF Reports ---
+  ReportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'content-review-reports-${AWS::AccountId}'
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldReports
+            Status: Enabled
+            ExpirationInDays: 90
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: content-review-dashboard
+
+Outputs:
+  ClusterEndpoint:
+    Description: Aurora cluster endpoint
+    Value: !GetAtt AuroraCluster.Endpoint.Address
+  
+  ClusterPort:
+    Description: Aurora cluster port
+    Value: !GetAtt AuroraCluster.Endpoint.Port
+  
+  DatabaseName:
+    Description: Database name
+    Value: !Ref DBName
+  
+  ReportsBucketName:
+    Description: S3 bucket for PDF reports
+    Value: !Ref ReportsBucket
+  
+  SecurityGroupId:
+    Description: Security group ID
+    Value: !GetAtt AuroraSecurityGroup.GroupId
+  
+  DatabaseURL:
+    Description: Connection string (add password)
+    Value: !Sub 'postgresql://${DBMasterUsername}:PASSWORD@${AuroraCluster.Endpoint.Address}:${AuroraCluster.Endpoint.Port}/${DBName}'
