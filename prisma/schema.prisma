@@ -55,6 +55,9 @@ model Article {
   submittedAt   DateTime?     @map("submitted_at")
   completedAt   DateTime?     @map("completed_at")
   
+  // Copyleaks tracking
+  copyleaksScanId String?     @unique @map("copyleaks_scan_id")
+  
   // Content snapshot (for Copyleaks submission)
   contentHash   String?       @map("content_hash") // MD5 to detect re-edits
   lastModified  DateTime?     @map("last_modified")
