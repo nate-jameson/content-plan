@@ -59,8 +59,9 @@ async function handleSubmit() {
           continue;
         }
 
-        // Generate a unique scan ID for Copyleaks
-        const scanId = `cr-${article.id}-${Date.now()}`;
+        // Generate a unique scan ID for Copyleaks (max 36 chars)
+        const shortId = crypto.randomUUID().replace(/-/g, '').slice(0, 32);
+        const scanId = `cr-${shortId}`;
 
         // Update content hash based on actual content
         const contentHash = crypto
@@ -82,6 +83,7 @@ async function handleSubmit() {
           where: { id: article.id },
           data: {
             status: 'SCANNING',
+            copyleaksScanId: scanId,
             submittedAt: new Date(),
             contentHash,
             wordCount: content.split(/\s+/).filter(Boolean).length,
