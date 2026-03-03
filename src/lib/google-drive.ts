@@ -103,7 +103,7 @@ export async function getChanges(
   let newStartPageToken = startPageToken;
 
   do {
-    const response = await drive.changes.list({
+    const response: { data: { nextPageToken?: string | null; newStartPageToken?: string | null; changes?: Array<{ fileId?: string | null; file?: { id?: string | null; name?: string | null; mimeType?: string | null; webViewLink?: string | null; modifiedTime?: string | null; createdTime?: string | null; trashed?: boolean | null; parents?: string[] | null } | null }> | null } } = await drive.changes.list({
       pageToken,
       fields: 'nextPageToken, newStartPageToken, changes(fileId, file(id, name, mimeType, webViewLink, modifiedTime, createdTime, trashed, parents))',
       includeItemsFromAllDrives: true,
