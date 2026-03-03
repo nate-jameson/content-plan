@@ -16,7 +16,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     EmailProvider({
-      server: '', // Not used — custom sendVerificationRequest handles email via SES
+      server: {
+        host: 'email-smtp.us-west-2.amazonaws.com',
+        port: 587,
+        auth: {
+          user: process.env.SES_ACCESS_KEY_ID || '',
+          pass: process.env.SES_SECRET_ACCESS_KEY || '',
+        },
+      },
       from: process.env.EMAIL_FROM || 'no-reply@jmsn.com',
       sendVerificationRequest: async ({ identifier: email, url }) => {
         // Check allowlist BEFORE sending email (fail fast with clear message)
