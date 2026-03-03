@@ -74,7 +74,7 @@ export default async function WriterDetailPage({
               <h1 className="text-2xl font-bold text-slate-100">
                 {writer.name}
               </h1>
-              <p className="text-sm text-slate-400">{writer.email}</p>
+              {writer.email && <p className="text-sm text-slate-400">{writer.email}</p>}
               <a
                 href={`https://drive.google.com/drive/folders/${writer.driveFolderId}`}
                 target="_blank"

@@ -16,7 +16,7 @@ datasource db {
 model Writer {
   id              String   @id @default(cuid())
   name            String
-  email           String   @unique
+  email           String?  @unique
   driveFolderId   String   @unique @map("drive_folder_id")
   driveFolderName String?  @map("drive_folder_name")
   avatarUrl       String?  @map("avatar_url")

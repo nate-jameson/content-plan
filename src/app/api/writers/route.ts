@@ -6,9 +6,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, email, driveFolderId } = body;
 
-    if (!name || !email || !driveFolderId) {
+    if (!name || !driveFolderId) {
       return NextResponse.json(
-        { error: 'Name, email, and Drive folder ID are required' },
+        { error: 'Name and Drive folder ID are required' },
         { status: 400 }
       );
     }
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const writer = await prisma.writer.create({
       data: {
         name,
-        email,
+        ...(email ? { email } : {}),
         driveFolderId,
       },
     });

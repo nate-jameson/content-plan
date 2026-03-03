@@ -58,7 +58,7 @@ export default async function WritersPage() {
                       {writer.name}
                     </Link>
                   </td>
-                  <td className="p-4 text-slate-400">{writer.email}</td>
+                  <td className="p-4 text-slate-400">{writer.email || '—'}</td>
                   <td className="p-4">
                     <a
                       href={`https://drive.google.com/drive/folders/${writer.driveFolderId}`}

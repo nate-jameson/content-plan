@@ -4,6 +4,17 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 
+function extractDriveFolderId(input: string): string {
+  const trimmed = input.trim();
+  // Match: https://drive.google.com/drive/folders/FOLDER_ID
+  // Match: https://drive.google.com/drive/u/0/folders/FOLDER_ID
+  // Match: https://drive.google.com/drive/folders/FOLDER_ID?...
+  const match = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (match) return match[1];
+  // If no URL pattern, assume it's already an ID
+  return trimmed;
+}
+
 export function AddWriterForm() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -18,8 +29,8 @@ export function AddWriterForm() {
     const formData = new FormData(e.currentTarget);
     const data = {
       name: formData.get('name') as string,
-      email: formData.get('email') as string,
-      driveFolderId: formData.get('driveFolderId') as string,
+      email: formData.get('email') as string || undefined,
+      driveFolderId: extractDriveFolderId(formData.get('driveFolderId') as string),
     };
 
     try {
@@ -73,24 +84,23 @@ export function AddWriterForm() {
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-400">
-            Email
+            Email (optional)
           </label>
           <input
             name="email"
             type="email"
-            required
             placeholder="jane@example.com"
             className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
           />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-400">
-            Google Drive Folder ID
+            Google Drive Folder (ID or URL)
           </label>
           <input
             name="driveFolderId"
             required
-            placeholder="1a2b3c4d5e6f..."
+            placeholder="Paste folder URL or ID"
             className="w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
           />
         </div>
