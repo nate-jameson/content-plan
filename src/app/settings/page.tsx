@@ -16,6 +16,10 @@ interface ConnectionStatus {
   copyleaks: boolean;
   googleDrive: boolean;
   ses: boolean;
+  missing?: {
+    googleDrive?: string[];
+    copyleaks?: string[];
+  };
 }
 
 export default function SettingsPage() {
@@ -220,8 +224,8 @@ export default function SettingsPage() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatusCard icon={Database} label="Database" connected={status?.database} />
-          <StatusCard icon={Cloud} label="Copyleaks API" connected={status?.copyleaks} />
-          <StatusCard icon={FolderOpen} label="Google Drive" connected={status?.googleDrive} />
+          <StatusCard icon={Cloud} label="Copyleaks API" connected={status?.copyleaks} missing={status?.missing?.copyleaks} />
+          <StatusCard icon={FolderOpen} label="Google Drive" connected={status?.googleDrive} missing={status?.missing?.googleDrive} />
           <StatusCard icon={Mail} label="AWS SES (Email)" connected={status?.ses} />
         </div>
       </div>
@@ -242,10 +246,11 @@ export default function SettingsPage() {
   );
 }
 
-function StatusCard({ icon: Icon, label, connected }: {
+function StatusCard({ icon: Icon, label, connected, missing }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   connected?: boolean;
+  missing?: string[];
 }) {
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-4">
@@ -260,9 +265,21 @@ function StatusCard({ icon: Icon, label, connected }: {
           <CheckCircle2 className="h-3.5 w-3.5" /> Connected
         </p>
       ) : (
-        <p className="flex items-center gap-1 text-sm text-slate-500">
-          <XCircle className="h-3.5 w-3.5" /> Not configured
-        </p>
+        <div>
+          <p className="flex items-center gap-1 text-sm text-amber-400">
+            <XCircle className="h-3.5 w-3.5" /> Not configured
+          </p>
+          {missing && missing.length > 0 && (
+            <div className="mt-2 text-xs text-slate-500">
+              <p className="mb-1 text-slate-400">Missing env vars:</p>
+              {missing.map((v) => (
+                <code key={v} className="mr-1 inline-block rounded bg-slate-800 px-1.5 py-0.5 text-amber-300/70">
+                  {v}
+                </code>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
