@@ -7,8 +7,8 @@ export function middleware(request: NextRequest) {
   // Allow auth API routes, webhooks, and public API endpoints
   if (
     pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/copyleaks-webhook') ||
-    pathname.startsWith('/api/scan/drive-poll') ||
+    pathname.startsWith('/api/copyleaks') ||
+    pathname.startsWith('/api/drive') ||
     pathname.startsWith('/api/settings/status') ||
     pathname.startsWith('/api/debug')
   ) {
