@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, Database, Cloud, FolderOpen, Info, CheckCircle2, XCircle, UserPlus, Trash2, Users, Mail, Loader2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Settings, Database, Cloud, FolderOpen, Info, CheckCircle2, XCircle, AlertCircle, UserPlus, Trash2, Users, Mail, Loader2, Link2 } from 'lucide-react';
 
 interface AllowedUser {
   id: string;
@@ -11,18 +12,21 @@ interface AllowedUser {
   addedAt: string;
 }
 
-interface ConnectionStatus {
-  database: boolean;
-  copyleaks: boolean;
-  googleDrive: boolean;
-  ses: boolean;
-  missing?: {
-    googleDrive?: string[];
-    copyleaks?: string[];
-  };
+interface ServiceStatus {
+  status: string;
+  detail: string;
+  missing: string[];
+  account?: string;
+}
+
+interface StatusResponse {
+  database: ServiceStatus;
+  googleDrive: ServiceStatus;
+  copyleaks: ServiceStatus;
 }
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
   const [users, setUsers] = useState<AllowedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -31,7 +35,11 @@ export default function SettingsPage() {
   const [newRole, setNewRole] = useState('editor');
   const [error, setError] = useState('');
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [status, setStatus] = useState<ConnectionStatus | null>(null);
+  const [status, setStatus] = useState<StatusResponse | null>(null);
+
+  // Check for OAuth callback params
+  const driveConnected = searchParams.get('drive_connected');
+  const driveError = searchParams.get('drive_error');
 
   useEffect(() => {
     fetchUsers();
@@ -90,6 +98,10 @@ export default function SettingsPage() {
     setRemovingId(null);
   }
 
+  function connectGoogleDrive() {
+    window.location.href = '/api/auth/google-drive';
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -97,6 +109,24 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold text-slate-100">Settings</h1>
         <p className="text-sm text-slate-400">System configuration, team access, and connection status</p>
       </div>
+
+      {/* Google Drive OAuth result banners */}
+      {driveConnected && (
+        <div className="flex items-center gap-2 rounded-lg border border-green-800 bg-green-900/20 p-4 text-sm text-green-400">
+          <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+          <span>Google Drive connected successfully! You can now monitor writer folders.</span>
+        </div>
+      )}
+      {driveError && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-800 bg-red-900/20 p-4 text-sm text-red-400">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <span>
+            Google Drive connection failed: {driveError === 'no_refresh_token'
+              ? 'No refresh token received. Please revoke access at myaccount.google.com/permissions and try again.'
+              : driveError}
+          </span>
+        </div>
+      )}
 
       {/* Team Access */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
@@ -222,11 +252,48 @@ export default function SettingsPage() {
           <Settings className="h-5 w-5 text-teal-400" />
           Connection Status
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatusCard icon={Database} label="Database" connected={status?.database} />
-          <StatusCard icon={Cloud} label="Copyleaks API" connected={status?.copyleaks} missing={status?.missing?.copyleaks} />
-          <StatusCard icon={FolderOpen} label="Google Drive" connected={status?.googleDrive} missing={status?.missing?.googleDrive} />
-          <StatusCard icon={Mail} label="AWS SES (Email)" connected={status?.ses} />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <StatusCard
+            icon={Database}
+            label="Database"
+            status={status?.database?.status}
+            detail={status?.database?.detail}
+            missing={status?.database?.missing}
+          />
+          <StatusCard
+            icon={FolderOpen}
+            label="Google Drive"
+            status={status?.googleDrive?.status}
+            detail={status?.googleDrive?.detail}
+            missing={status?.googleDrive?.missing}
+            account={status?.googleDrive?.account}
+            action={
+              status?.googleDrive?.status === 'needs_auth' ? (
+                <button
+                  onClick={connectGoogleDrive}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-500 transition-colors"
+                >
+                  <Link2 className="h-4 w-4" />
+                  Connect Google Account
+                </button>
+              ) : status?.googleDrive?.status === 'connected' ? (
+                <button
+                  onClick={connectGoogleDrive}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-300 transition-colors"
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Reconnect
+                </button>
+              ) : undefined
+            }
+          />
+          <StatusCard
+            icon={Cloud}
+            label="Copyleaks API"
+            status={status?.copyleaks?.status}
+            detail={status?.copyleaks?.detail}
+            missing={status?.copyleaks?.missing}
+          />
         </div>
       </div>
 
@@ -237,7 +304,7 @@ export default function SettingsPage() {
           About
         </h2>
         <div className="space-y-2 text-sm text-slate-400">
-          <p><span className="text-slate-300">Version:</span> 1.1.0</p>
+          <p><span className="text-slate-300">Version:</span> 1.2.0</p>
           <p><span className="text-slate-300">Stack:</span> Next.js 15, NextAuth, Prisma, Aurora PostgreSQL, AWS SES</p>
           <p><span className="text-slate-300">Auth:</span> Magic Link via AWS SES</p>
         </div>
@@ -246,11 +313,14 @@ export default function SettingsPage() {
   );
 }
 
-function StatusCard({ icon: Icon, label, connected, missing }: {
+function StatusCard({ icon: Icon, label, status, detail, missing, account, action }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
-  connected?: boolean;
+  status?: string;
+  detail?: string;
   missing?: string[];
+  account?: string;
+  action?: React.ReactNode;
 }) {
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-4">
@@ -258,12 +328,33 @@ function StatusCard({ icon: Icon, label, connected, missing }: {
         <Icon className="h-4 w-4 text-teal-400" />
         <span className="text-sm font-medium text-slate-200">{label}</span>
       </div>
-      {connected === undefined ? (
-        <p className="text-sm text-slate-500">Checking...</p>
-      ) : connected ? (
-        <p className="flex items-center gap-1 text-sm text-green-400">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Connected
-        </p>
+      {!status ? (
+        <div className="flex items-center gap-1 text-sm text-slate-500">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking...
+        </div>
+      ) : status === 'connected' ? (
+        <div>
+          <p className="flex items-center gap-1 text-sm text-green-400">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Connected
+          </p>
+          {(detail || account) && (
+            <p className="mt-1 text-xs text-slate-500">{account || detail}</p>
+          )}
+        </div>
+      ) : status === 'needs_auth' ? (
+        <div>
+          <p className="flex items-center gap-1 text-sm text-amber-400">
+            <AlertCircle className="h-3.5 w-3.5" /> Needs authorization
+          </p>
+          {detail && <p className="mt-1 text-xs text-slate-500">{detail}</p>}
+        </div>
+      ) : status === 'error' ? (
+        <div>
+          <p className="flex items-center gap-1 text-sm text-red-400">
+            <XCircle className="h-3.5 w-3.5" /> Error
+          </p>
+          {detail && <p className="mt-1 text-xs text-red-300/70">{detail}</p>}
+        </div>
       ) : (
         <div>
           <p className="flex items-center gap-1 text-sm text-amber-400">
@@ -281,6 +372,7 @@ function StatusCard({ icon: Icon, label, connected, missing }: {
           )}
         </div>
       )}
+      {action}
     </div>
   );
 }

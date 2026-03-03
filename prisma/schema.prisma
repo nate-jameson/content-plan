@@ -171,6 +171,17 @@ model SyncState {
 }
 
 // ============================================================
+// APP SETTINGS (key-value store for OAuth tokens, config, etc.)
+// ============================================================
+model AppSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
+// ============================================================
 // AUTH (NextAuth.js)
 // ============================================================
 model Account {

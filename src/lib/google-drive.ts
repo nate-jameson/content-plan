@@ -5,27 +5,65 @@
 // Uses Google Drive API v3 with OAuth2 service account or user tokens.
 
 import { google, drive_v3 } from 'googleapis';
+import { PrismaClient } from '@prisma/client';
 
 let driveClient: drive_v3.Drive | null = null;
+let cachedRefreshToken: string | null = null;
+
+/**
+ * Get the Google refresh token.
+ * Checks env var first, then falls back to database (from OAuth flow).
+ */
+async function getRefreshToken(): Promise<string | null> {
+  // Env var takes precedence
+  if (process.env.GOOGLE_REFRESH_TOKEN) {
+    return process.env.GOOGLE_REFRESH_TOKEN;
+  }
+  // Check database
+  if (cachedRefreshToken) return cachedRefreshToken;
+  try {
+    const prisma = new PrismaClient();
+    const setting = await prisma.appSetting.findUnique({ where: { key: 'google_refresh_token' } });
+    await prisma.$disconnect();
+    if (setting?.value) {
+      cachedRefreshToken = setting.value;
+      return cachedRefreshToken;
+    }
+  } catch {
+    // Table may not exist yet
+  }
+  return null;
+}
 
 /**
  * Initialize the Google Drive client.
- * Uses OAuth2 credentials stored in environment variables.
+ * Uses OAuth2 credentials from env vars + refresh token from env or database.
  */
-function getDriveClient(): drive_v3.Drive {
+async function getDriveClient(): Promise<drive_v3.Drive> {
   if (driveClient) return driveClient;
+
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) {
+    throw new Error('Google Drive not connected. Please connect via Settings.');
+  }
 
   const auth = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
   );
 
-  auth.setCredentials({
-    refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-  });
+  auth.setCredentials({ refresh_token: refreshToken });
 
   driveClient = google.drive({ version: 'v3', auth });
   return driveClient;
+}
+
+/**
+ * Reset the cached client (e.g., after re-authenticating).
+ */
+export function resetDriveClient() {
+  driveClient = null;
+  cachedRefreshToken = null;
 }
 
 export interface DriveFile {
@@ -42,7 +80,7 @@ export interface DriveFile {
  * Filters to only Google Docs (not PDFs, images, etc.)
  */
 export async function listDocsInFolder(folderId: string): Promise<DriveFile[]> {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   const files: DriveFile[] = [];
   let pageToken: string | undefined;
 
@@ -85,7 +123,7 @@ export async function getChanges(
   modifiedFiles: DriveFile[];
   nextPageToken: string;
 }> {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   // If no token, get the current token (first sync)
   if (!startPageToken) {
@@ -152,7 +190,7 @@ export async function getChanges(
  * Exports as plain text for Copyleaks submission.
  */
 export async function getDocContent(docId: string): Promise<string> {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   
   const response = await drive.files.export({
     fileId: docId,
@@ -167,7 +205,7 @@ export async function getDocContent(docId: string): Promise<string> {
  * Useful for preserving formatting in reports.
  */
 export async function getDocHtml(docId: string): Promise<string> {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   
   const response = await drive.files.export({
     fileId: docId,
@@ -192,7 +230,7 @@ export async function addScanResultComment(
     dashboardUrl: string;
   }
 ): Promise<void> {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   // Build comment text
   const lines = [
