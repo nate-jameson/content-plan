@@ -67,7 +67,7 @@ export async function submitScan(params: {
   const token = await getAccessToken();
 
   const response = await fetch(
-    `${COPYLEAKS_API_BASE}/v2/writer/create/${params.scanId}`,
+    `${COPYLEAKS_API_BASE}/v3/scans/submit/file/${params.scanId}`,
     {
       method: 'PUT',
       headers: {
@@ -120,7 +120,7 @@ export async function downloadPdfReport(scanId: string): Promise<Buffer> {
   const token = await getAccessToken();
 
   const response = await fetch(
-    `${COPYLEAKS_API_BASE}/v1/downloads/${scanId}/report.pdf`,
+    `${COPYLEAKS_API_BASE}/v3/downloads/${scanId}/report.pdf`,
     {
       headers: { 'Authorization': `Bearer ${token}` },
     }
@@ -142,7 +142,7 @@ export async function exportResults(scanId: string): Promise<any> {
 
   // Request full export with all result details
   const response = await fetch(
-    `${COPYLEAKS_API_BASE}/v1/downloads/${scanId}/export`,
+    `${COPYLEAKS_API_BASE}/v3/downloads/${scanId}/export`,
     {
       method: 'POST',
       headers: {
