@@ -4,7 +4,7 @@
 // Called on schedule (cron) to check all active writer folders
 // for new or updated Google Docs.
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { listDocsInFolder } from '@/lib/google-drive';
 import crypto from 'crypto';
@@ -12,7 +12,15 @@ import crypto from 'crypto';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Verify cron secret if configured (Vercel Pro sends this automatically)
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
   try {
     const writers = await prisma.writer.findMany({
       where: { isActive: true },
@@ -25,7 +33,9 @@ export async function GET() {
 
     for (const writer of writers) {
       try {
+        console.log(`[Drive Poll] Scanning folder ${writer.driveFolderId} for writer "${writer.name}"...`);
         const docs = await listDocsInFolder(writer.driveFolderId);
+        console.log(`[Drive Poll] Found ${docs.length} docs in folder for "${writer.name}"`);
 
         // Get existing articles for this writer
         const existingArticles = await prisma.article.findMany({
@@ -74,24 +84,4 @@ export async function GET() {
           }
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        errors.push(`Writer "${writer.name}": ${message}`);
-        console.error(`[Drive Poll] Error for writer ${writer.name}:`, err);
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      writers: writers.length,
-      newArticles: totalNew,
-      updatedArticles: totalUpdated,
-      errors: errors.length > 0 ? errors : undefined,
-    });
-  } catch (error) {
-    console.error('[Drive Poll] Fatal error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Drive poll failed' },
-      { status: 500 }
-    );
-  }
-}
+        const message = err instanceof Error ? err.message

@@ -91,6 +91,8 @@ export async function listDocsInFolder(folderId: string): Promise<DriveFile[]> {
       pageSize: 100,
       pageToken,
       orderBy: 'modifiedTime desc',
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
     });
 
     if (response.data.files) {
