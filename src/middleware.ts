@@ -9,6 +9,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/copyleaks-webhook') ||
     pathname.startsWith('/api/scan/drive-poll') ||
+    pathname.startsWith('/api/settings/status') ||
     pathname.startsWith('/api/debug')
   ) {
     return NextResponse.next();
