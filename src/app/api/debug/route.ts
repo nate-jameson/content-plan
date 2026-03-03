@@ -12,6 +12,9 @@ export async function GET() {
     SES_SECRET_ACCESS_KEY: !!process.env.SES_SECRET_ACCESS_KEY,
     SES_REGION: process.env.SES_REGION || false,
     EMAIL_FROM: process.env.EMAIL_FROM || false,
+    COPYLEAKS_EMAIL: process.env.COPYLEAKS_EMAIL || false,
+    COPYLEAKS_API_KEY: !!process.env.COPYLEAKS_API_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || false,
   };
 
   // Try importing auth to see if it throws
