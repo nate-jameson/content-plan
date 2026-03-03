@@ -21,6 +21,12 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Trigger an immediate drive poll for the new writer's folder
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || 'https://content.jmsn.com';
+      fetch(`${baseUrl}/api/scan/drive-poll`, { method: 'GET' }).catch(() => {});
+    } catch {}
+
     return NextResponse.json({ success: true, writer });
   } catch (error: any) {
     if (error?.code === 'P2002') {
@@ -30,14 +36,4 @@ export async function POST(request: NextRequest) {
       );
     }
     console.error('[Writers API] Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
-export async function GET() {
-  const writers = await prisma.writer.findMany({
-    orderBy: { name: 'asc' },
-    include: { _count: { select: { articles: true } } },
-  });
-  return NextResponse.json(writers);
-}
+    return NextResponse.json({ error: 'Internal 
