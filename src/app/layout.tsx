@@ -10,6 +10,10 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 export const metadata: Metadata = {
   title: 'Content Review Dashboard',
   description: 'Monitor writer content for plagiarism, AI detection, and grammar quality',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default async function RootLayout({
