@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/copyleaks') ||
-    pathname.startsWith('/api/drive') ||
+    pathname.startsWith('/api/scan') ||
     pathname.startsWith('/api/settings/status') ||
     pathname.startsWith('/api/debug')
   ) {
