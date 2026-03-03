@@ -84,4 +84,24 @@ export async function GET(request: NextRequest) {
           }
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message
+        const message = err instanceof Error ? err.message : String(err);
+        errors.push(`Writer "${writer.name}": ${message}`);
+        console.error(`[Drive Poll] Error for writer ${writer.name}:`, err);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      writers: writers.length,
+      newArticles: totalNew,
+      updatedArticles: totalUpdated,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error) {
+    console.error('[Drive Poll] Fatal error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Drive poll failed' },
+      { status: 500 }
+    );
+  }
+}

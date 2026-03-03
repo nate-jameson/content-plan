@@ -36,4 +36,14 @@ export async function POST(request: NextRequest) {
       );
     }
     console.error('[Writers API] Error:', error);
-    return NextResponse.json({ error: 'Internal 
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  const writers = await prisma.writer.findMany({
+    orderBy: { name: 'asc' },
+    include: { _count: { select: { articles: true } } },
+  });
+  return NextResponse.json(writers);
+}
