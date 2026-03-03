@@ -1,25 +1,40 @@
-import { auth } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const isLoginPage = req.nextUrl.pathname.startsWith('/login');
-  const isAuthApi = req.nextUrl.pathname.startsWith('/api/auth');
-  const isWebhook = req.nextUrl.pathname.startsWith('/api/copyleaks-webhook');
-  const isDrivePoll = req.nextUrl.pathname.startsWith('/api/scan/drive-poll');
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
   // Allow auth API routes, webhooks, and public API endpoints
-  if (isAuthApi || isWebhook || isDrivePoll) return;
+  if (
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/copyleaks-webhook') ||
+    pathname.startsWith('/api/scan/drive-poll')
+  ) {
+    return NextResponse.next();
+  }
+
+  // Check for NextAuth session cookie (works on Edge without importing Node.js modules)
+  const sessionToken =
+    request.cookies.get('__Secure-authjs.session-token') ||
+    request.cookies.get('authjs.session-token') ||
+    request.cookies.get('next-auth.session-token') ||
+    request.cookies.get('__Secure-next-auth.session-token');
+
+  const isLoggedIn = !!sessionToken;
+  const isLoginPage = pathname.startsWith('/login');
 
   // Redirect to login if not authenticated
   if (!isLoggedIn && !isLoginPage) {
-    return Response.redirect(new URL('/login', req.nextUrl));
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // Redirect to dashboard if already logged in and on login page
   if (isLoggedIn && isLoginPage) {
-    return Response.redirect(new URL('/', req.nextUrl));
+    return NextResponse.redirect(new URL('/', request.url));
   }
-});
+
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],

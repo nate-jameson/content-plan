@@ -16,6 +16,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     EmailProvider({
+      server: { host: 'localhost', port: 587, auth: { user: '', pass: '' } }, // Dummy - we use custom sendVerificationRequest with SES
       from: process.env.EMAIL_FROM || 'no-reply@jmsn.com',
       sendVerificationRequest: async ({ identifier: email, url }) => {
         const command = new SendEmailCommand({
