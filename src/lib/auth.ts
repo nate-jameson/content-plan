@@ -7,8 +7,8 @@ import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 const sesClient = new SESClient({
   region: process.env.SES_REGION || 'us-west-2',
   credentials: {
-    accessKeyId: process.env.SES_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.SES_SECRET_ACCESS_KEY!,
+    accessKeyId: process.env.SES_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.SES_SECRET_ACCESS_KEY || '',
   },
 });
 
@@ -16,9 +16,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     EmailProvider({
-      server: { host: 'localhost', port: 587, auth: { user: '', pass: '' } }, // Dummy - we use custom sendVerificationRequest with SES
+      server: '', // Not used — custom sendVerificationRequest handles email via SES
       from: process.env.EMAIL_FROM || 'no-reply@jmsn.com',
       sendVerificationRequest: async ({ identifier: email, url }) => {
+        // Check allowlist BEFORE sending email (fail fast with clear message)
+        const allowed = await prisma.allowedUser.findUnique({
+          where: { email: email.toLowerCase() },
+        });
+        if (!allowed) {
+          throw new Error('ACCESS_DENIED');
+        }
+
         const command = new SendEmailCommand({
           Source: process.env.EMAIL_FROM || 'no-reply@jmsn.com',
           Destination: { ToAddresses: [email] },
@@ -47,7 +55,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             },
           },
         });
-        await sesClient.send(command);
+
+        try {
+          await sesClient.send(command);
+        } catch (err) {
+          console.error('SES email send failed:', err);
+          throw new Error('EMAIL_SEND_FAILED');
+        }
       },
     }),
   ],

@@ -26,7 +26,14 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setError('Access denied. Your email is not on the approved list.');
+        // NextAuth returns error codes - provide specific messages
+        if (result.error === 'AccessDenied') {
+          setError('Access denied. Your email is not on the approved list.');
+        } else if (result.error === 'EmailSignin') {
+          setError('Failed to send sign-in email. Please try again or contact an admin.');
+        } else {
+          setError(`Sign-in error: ${result.error}. Please try again.`);
+        }
         setLoading(false);
       } else {
         // Redirect to verify page
