@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import {
   LayoutDashboard,
   Users,
   FileText,
   Settings,
   ShieldCheck,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,25 +22,21 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-slate-700 bg-slate-950">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-slate-700 px-6">
         <ShieldCheck className="h-7 w-7 text-teal-500" />
-        <span className="text-lg font-semibold text-slate-100">
-          ContentReview
-        </span>
+        <span className="text-lg font-semibold text-slate-100">ContentReview</span>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
           const isActive =
-            item.href === '/'
-              ? pathname === '/'
-              : pathname.startsWith(item.href);
-
+            item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
@@ -57,10 +55,18 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
+      {/* User & Sign Out */}
       <div className="border-t border-slate-700 p-4">
-        <p className="text-xs text-slate-500">Content Review Dashboard</p>
-        <p className="text-xs text-slate-600">v1.0.0</p>
+        {session?.user?.email && (
+          <p className="mb-2 truncate text-xs text-slate-400">{session.user.email}</p>
+        )}
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-800 hover:text-slate-300 transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </button>
       </div>
     </aside>
   );
