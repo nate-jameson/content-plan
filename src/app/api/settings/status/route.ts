@@ -40,4 +40,47 @@ export async function GET() {
         if (hasRefreshToken) {
           // Get connected account email
           const emailSetting = await prisma.appSetting.findUnique({ where: { key: 'google_account_email' } });
-          driveAccount = emailSetting?.value 
+          driveAccount = emailSetting?.value || '';
+        }
+      } catch {
+        // Table may not exist yet - that's OK
+      }
+    }
+
+    if (driveMissing.length > 0) {
+      driveStatus = 'not_configured';
+      driveDetail = `Missing: ${driveMissing.join(', ')}`;
+    } else if (!hasRefreshToken) {
+      driveStatus = 'needs_auth';
+      driveDetail = 'Click "Connect Google Account" to authorize';
+    } else {
+      driveStatus = 'connected';
+      driveDetail = driveAccount ? `Connected as ${driveAccount}` : 'Connected';
+    }
+
+    // --- Copyleaks ---
+    let copyleaksStatus = 'not_configured';
+    let copyleaksDetail = '';
+    const copyleaksMissing: string[] = [];
+    if (!process.env.COPYLEAKS_API_KEY) copyleaksMissing.push('COPYLEAKS_API_KEY');
+    if (!process.env.COPYLEAKS_EMAIL) copyleaksMissing.push('COPYLEAKS_EMAIL');
+
+    if (copyleaksMissing.length > 0) {
+      copyleaksDetail = `Missing: ${copyleaksMissing.join(', ')}`;
+    } else {
+      copyleaksStatus = 'connected';
+      copyleaksDetail = 'API credentials configured';
+    }
+
+    return NextResponse.json({
+      database: { status: dbStatus, detail: dbDetail, missing: dbMissing },
+      googleDrive: { status: driveStatus, detail: driveDetail, missing: driveMissing, account: driveAccount },
+      copyleaks: { status: copyleaksStatus, detail: copyleaksDetail, missing: copyleaksMissing },
+    });
+  } catch (err) {
+    console.error('Status check error:', err);
+    return NextResponse.json({ error: 'Status check failed' }, { status: 500 });
+  } finally {
+    await prisma.$disconnect();
+  }
+}
