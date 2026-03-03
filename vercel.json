@@ -3,6 +3,10 @@
     {
       "path": "/api/scan/drive-poll",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/scan/submit",
+      "schedule": "3,18,33,48 * * * *"
     }
   ]
 }

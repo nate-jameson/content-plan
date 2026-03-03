@@ -90,11 +90,45 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Auto-submit any pending articles to Copyleaks
+    let totalSubmitted = 0;
+    if (totalNew > 0 || totalUpdated > 0) {
+      try {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://content.jmsn.com';
+        let hasMore = true;
+
+        while (hasMore) {
+          console.log('[Drive Poll] Triggering scan submission...');
+          const submitRes = await fetch(`${appUrl}/api/scan/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+
+          if (!submitRes.ok) {
+            console.error('[Drive Poll] Submit call failed:', submitRes.status);
+            break;
+          }
+
+          const submitData = await submitRes.json();
+          totalSubmitted += submitData.submitted || 0;
+
+          // Stop if no more articles were submitted (backlog clear)
+          hasMore = (submitData.submitted || 0) > 0;
+        }
+
+        console.log(`[Drive Poll] Auto-submitted ${totalSubmitted} articles to Copyleaks`);
+      } catch (submitErr) {
+        console.error('[Drive Poll] Auto-submit error:', submitErr);
+        errors.push(`Auto-submit failed: ${submitErr instanceof Error ? submitErr.message : String(submitErr)}`);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       writers: writers.length,
       newArticles: totalNew,
       updatedArticles: totalUpdated,
+      submitted: totalSubmitted,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {

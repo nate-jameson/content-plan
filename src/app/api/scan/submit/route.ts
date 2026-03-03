@@ -16,7 +16,16 @@ export const maxDuration = 120;
 
 const MAX_SUBMISSIONS_PER_CALL = 5;
 
+// Also support GET for Vercel cron
+export async function GET() {
+  return handleSubmit();
+}
+
 export async function POST() {
+  return handleSubmit();
+}
+
+async function handleSubmit() {
   try {
     // Find articles ready for submission
     const articles = await prisma.article.findMany({
