@@ -89,6 +89,9 @@ export async function submitScan(params: {
           },
           aiGeneratedText: {
             detect: true,
+            explain: {
+              enable: true,
+            },
           },
           // writingFeedback not available on current plan
           scanning: {

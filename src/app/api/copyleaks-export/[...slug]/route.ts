@@ -70,24 +70,18 @@ async function handleAiDetection(copyleaksScanId: string, request: NextRequest) 
     return NextResponse.json({ error: 'Scan result not found' }, { status: 404 });
   }
 
-  // Extract AI detection summary
-  // Format: { summary: { human: 0.95, ai: 0.05 }, results: [...], modelVersion: "v7.1" }
+  // Extract AI detection summary from Copyleaks (for reference/logging)
   const aiSummary = body?.summary ?? {};
-  const aiScore = aiSummary.ai ?? 0;
-  const humanScore = aiSummary.human ?? 1;
+  const copyleaksAiScore = aiSummary.ai ?? 0;
+  const copyleaksHumanScore = aiSummary.human ?? 1;
 
-  console.log(`[Copyleaks Export] AI: ${(aiScore * 100).toFixed(1)}% | Human: ${(humanScore * 100).toFixed(1)}%`);
+  console.log(`[Copyleaks Export] Copyleaks scores - AI: ${(copyleaksAiScore * 100).toFixed(1)}% | Human: ${(copyleaksHumanScore * 100).toFixed(1)}%`);
 
-  // Store full AI detection response for detailed analysis
-  const explainData = body?.explain ?? null;
-
-  // Update scan result with AI scores and raw AI data
+  // Store full response (includes explain patterns) but defer score update until paragraphs are processed
   await prisma.scanResult.update({
     where: { id: scanResult.id },
     data: {
-      aiScore,
-      humanScore,
-      rawResponse: body, // Store full AI response for explain patterns
+      rawResponse: body,
     },
   });
 
@@ -143,6 +137,40 @@ async function handleAiDetection(copyleaksScanId: string, request: NextRequest) 
     });
 
     console.log(`[Copyleaks Export] Created ${paragraphs.length} paragraph classifications (${originalContent ? 'with' : 'without'} real text)`);
+
+    // Calculate AI score based on paragraph classifications (not Copyleaks summary)
+    // Score = proportion of paragraphs classified as AI
+    // Only shows 100% if EVERY paragraph is AI-attributed
+    const aiParaCount = paragraphs.filter((p: any) => p.classification === 'ai').length;
+    const mixedParaCount = paragraphs.filter((p: any) => p.classification === 'mixed').length;
+    const totalParaCount = paragraphs.length;
+
+    // Mixed paragraphs count as 0.5 AI
+    const calculatedAiScore = totalParaCount > 0
+      ? (aiParaCount + (mixedParaCount * 0.5)) / totalParaCount
+      : copyleaksAiScore;  // Fallback to Copyleaks score if no paragraphs
+    const calculatedHumanScore = 1 - calculatedAiScore;
+
+    console.log(`[Copyleaks Export] Calculated AI: ${(calculatedAiScore * 100).toFixed(1)}% (${aiParaCount} AI + ${mixedParaCount} mixed of ${totalParaCount} sections)`);
+
+    // Store the calculated scores
+    await prisma.scanResult.update({
+      where: { id: scanResult.id },
+      data: {
+        aiScore: calculatedAiScore,
+        humanScore: calculatedHumanScore,
+      },
+    });
+  } else {
+    // No paragraph-level data, use Copyleaks summary
+    await prisma.scanResult.update({
+      where: { id: scanResult.id },
+      data: {
+        aiScore: copyleaksAiScore,
+        humanScore: copyleaksHumanScore,
+      },
+    });
+    console.log(`[Copyleaks Export] No paragraph data, using Copyleaks summary: ${(copyleaksAiScore * 100).toFixed(1)}% AI`);
   }
 
   // Update writer aggregate stats with new AI score
@@ -200,7 +228,7 @@ async function handleAiDetection(copyleaksScanId: string, request: NextRequest) 
     console.error(`[Copyleaks Export] Failed to update doc comment:`, commentError);
   }
 
-  return NextResponse.json({ success: true, aiScore, humanScore });
+  return NextResponse.json({ success: true, aiScore: copyleaksAiScore, humanScore: copyleaksHumanScore });
 }
 
 /**
