@@ -109,7 +109,19 @@ export async function submitScan(params: {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Copyleaks scan submission failed: ${response.status} ${errorText}`);
+    // Include debug info about what we sent
+    const debugInfo = {
+      url: `${COPYLEAKS_API_BASE}/v3/scans/submit/file/${params.scanId}`,
+      method: 'PUT',
+      hasBase64: typeof Buffer.from(params.text).toString('base64') === 'string',
+      base64Length: Buffer.from(params.text).toString('base64').length,
+      textLength: params.text.length,
+      bodyKeys: Object.keys(JSON.parse(JSON.stringify({
+        base64: Buffer.from(params.text).toString('base64'),
+        filename: 'article.txt',
+      }))),
+    };
+    throw new Error(`Copyleaks scan submission failed: ${response.status} ${errorText} | debug: ${JSON.stringify(debugInfo)}`);
   }
 }
 
