@@ -81,27 +81,26 @@ export async function submitScan(params: {
           webhooks: {
             status: `${params.webhookUrl}/{STATUS}`,
           },
-          sandbox: params.sandbox ?? (process.env.NODE_ENV !== 'production'),
-          expiration: 480, // Results available for 480 hours
+          sandbox: params.sandbox ?? false,
+          expiration: 480,
           developerPayload: params.articleId,
           pdf: {
-            create: true, // Generate downloadable PDF report
+            create: true,
           },
           aiGeneratedText: {
-            detect: true, // Enable AI detection
+            detect: true,
           },
           writingFeedback: {
-            score: true, // Enable grammar/writing quality
+            enable: true,
           },
           scanning: {
-            internet: true,       // Check against internet
-            copyleaksDb: true,    // Check against Copyleaks database
-            repositories: true,   // Check against our internal repository
+            internet: true,
+            copyleaksDb: {
+              includeMySubmissions: true,
+              includeOthersSubmissions: true,
+            },
           },
-          indexing: {
-            repositories: ['default'], // Index in our repo for cross-writer checks
-          },
-          sensitivityLevel: 3, // 1-5, higher = stricter matching
+          sensitivityLevel: 3,
         },
       }),
     }
