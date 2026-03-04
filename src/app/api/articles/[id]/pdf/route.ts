@@ -35,7 +35,7 @@ export async function GET(
       .replace(/\s+/g, '-')
       .slice(0, 60);
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="copyleaks-${safeTitle}.pdf"`,
