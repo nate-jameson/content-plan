@@ -93,9 +93,11 @@ export async function submitScan(params: {
           // writingFeedback not available on current plan
           scanning: {
             internet: true,
-            // Disable internal DB matching to prevent self-matching false positives.
-            // Our articles were matching against our own previous submissions.
-            copyleaksDb: false,
+            // Disable self-matching to prevent false positives from our own submissions.
+            copyleaksDb: {
+              includeMySubmissions: false,
+              includeOthersSubmissions: true,
+            },
           },
           sensitivityLevel: 3,
         },
