@@ -8,12 +8,13 @@
 // 1. Copyleaks POSTs results here
 // 2. We parse plagiarism scores and source matches
 // 3. Store in database
-// 4. Post summary comment on the Google Doc
+// 4. Trigger export for AI detection + PDF
 // 5. Update article status
+// (Google Doc comment is posted after AI detection arrives via export)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { addScanResultComment } from '@/lib/google-drive';
+import { triggerExport } from '@/lib/copyleaks';
 
 export async function POST(
   request: NextRequest,
@@ -48,6 +49,7 @@ export async function POST(
 
 async function handleCompleted(payload: any) {
   const scanId = payload?.scannedDocument?.scanId;
+  const totalWords = payload?.scannedDocument?.totalWords ?? 0;
   
   // CRITICAL: developerPayload is at the ROOT level, NOT inside scannedDocument
   const articleId = payload?.developerPayload;
@@ -80,11 +82,39 @@ async function handleCompleted(payload: any) {
   const plagiarism = payload?.results?.score ?? { aggregatedScore: 0, identicalWords: 0 };
   const internetSources = payload?.results?.internet ?? [];
   const databaseSources = payload?.results?.database ?? [];
-  const allSources = [...internetSources, ...databaseSources];
+
+  // Collect all result IDs for the export (needed for detailed drill-down)
+  const allResultIds = [
+    ...internetSources.map((s: any) => s.id),
+    ...databaseSources.map((s: any) => s.id),
+  ];
+
+  // ---- Build Source Records ----
+  // Internet sources have URLs; database sources are internal Copyleaks matches
+  const sourceRecords = [
+    ...internetSources.map((source: any) => ({
+      sourceUrl: source.url ?? '',
+      sourceTitle: source.title || source.introduction || null,
+      matchedWords: source.matchedWords ?? source.identicalWords ?? 0,
+      // Calculate percentage from matched words
+      percentage: totalWords > 0
+        ? Math.round(((source.matchedWords ?? source.identicalWords ?? 0) / totalWords) * 1000) / 10
+        : 0,
+      isInternetSource: true,
+    })),
+    ...databaseSources.map((source: any) => ({
+      sourceUrl: '', // Database sources don't have public URLs
+      sourceTitle: source.introduction || source.title || 'Internal Database Match',
+      matchedWords: source.matchedWords ?? source.identicalWords ?? 0,
+      percentage: totalWords > 0
+        ? Math.round(((source.matchedWords ?? source.identicalWords ?? 0) / totalWords) * 1000) / 10
+        : 0,
+      isInternetSource: false,
+    })),
+  ];
 
   // ---- Store Scan Result ----
-  // Note: AI detection scores are NOT included in the completed webhook.
-  // They would need to be fetched via the export endpoint if needed.
+  // AI detection scores will be updated later via the export callback
   const scanResult = await prisma.scanResult.create({
     data: {
       articleId: article.id,
@@ -93,11 +123,11 @@ async function handleCompleted(payload: any) {
       // Plagiarism
       plagiarismScore: plagiarism.aggregatedScore ?? 0,
       matchedWords: plagiarism.identicalWords ?? 0,
-      totalWords: payload?.scannedDocument?.totalWords ?? 0,
+      totalWords,
 
-      // AI Detection - not available in completed webhook, default to 0
-      aiScore: 0,
-      humanScore: 1,
+      // AI Detection — placeholder until export delivers real scores
+      aiScore: -1,  // -1 means "pending" (export not yet received)
+      humanScore: -1,
 
       // Writing Quality - not available (not on plan)
       grammarScore: null,
@@ -112,13 +142,7 @@ async function handleCompleted(payload: any) {
 
       // Source matches
       sources: {
-        create: allSources.map((source: any) => ({
-          sourceUrl: source.url ?? '',
-          sourceTitle: source.title || null,
-          matchedWords: source.matchedWords ?? 0,
-          percentage: 0, // Individual source % not directly in webhook
-          isInternetSource: internetSources.includes(source),
-        })),
+        create: sourceRecords,
       },
     },
   });
@@ -129,11 +153,11 @@ async function handleCompleted(payload: any) {
     data: {
       status: 'COMPLETED',
       completedAt: new Date(),
-      wordCount: payload?.scannedDocument?.totalWords ?? article.wordCount,
+      wordCount: totalWords || article.wordCount,
     },
   });
 
-  // ---- Update Writer Aggregate Stats ----
+  // ---- Update Writer Aggregate Stats (plagiarism only for now) ----
   try {
     const writerStats = await prisma.scanResult.aggregate({
       where: { article: { writerId: article.writerId } },
@@ -149,33 +173,28 @@ async function handleCompleted(payload: any) {
       data: {
         totalArticles: { increment: 1 },
         avgPlagiarism: writerStats._avg.plagiarismScore ?? 0,
-        avgAiScore: writerStats._avg.aiScore ?? 0,
-        avgGrammarScore: writerStats._avg.grammarScore ?? 0,
       },
     });
   } catch (statsError) {
     console.error(`[Copyleaks] Failed to update writer stats:`, statsError);
-    // Non-fatal
   }
 
-  // ---- Post Comment on Google Doc ----
+  // ---- Trigger Export for AI Detection + PDF ----
   try {
-    const topSources = allSources
-      .sort((a: any, b: any) => (b.matchedWords ?? 0) - (a.matchedWords ?? 0))
-      .slice(0, 3)
-      .map((s: any) => ({ url: s.url, percentage: 0 }));
-
-    await addScanResultComment(article.googleDocId, {
-      plagiarismScore: plagiarism.aggregatedScore ?? 0,
-      aiScore: 0,
-      grammarScore: null,
-      readabilityGrade: null,
-      topSources,
-      dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/articles/${article.id}`,
+    await triggerExport({
+      copyleaksScanId: scanId,
+      scanResultId: scanResult.id,
+      resultIds: allResultIds,
     });
-  } catch (commentError) {
-    console.error(`[Copyleaks] Failed to post comment on doc ${article.googleDocId}:`, commentError);
-    // Non-fatal — results are still stored in dashboard
+    console.log(`[Copyleaks] Export triggered for AI detection + PDF`);
+  } catch (exportError) {
+    console.error(`[Copyleaks] Export trigger failed (non-fatal):`, exportError);
+    // Non-fatal — plagiarism results are stored, AI detection just won't be available
+    // Mark AI as unavailable (0) instead of pending (-1)
+    await prisma.scanResult.update({
+      where: { id: scanResult.id },
+      data: { aiScore: 0, humanScore: 0 },
+    });
   }
 
   console.log(`[Copyleaks] ✅ Scan complete for "${article.title}" by ${article.writer.name}`);

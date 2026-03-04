@@ -11,6 +11,8 @@ import {
   FileText,
   Globe,
   Download,
+  Database,
+  Loader2,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +30,7 @@ export default async function ArticleDetailPage({
       writer: true,
       scanResult: {
         include: {
-          sources: { orderBy: { percentage: 'desc' }, take: 20 },
+          sources: { orderBy: { matchedWords: 'desc' }, take: 20 },
           paragraphs: { orderBy: { paragraphIndex: 'asc' } },
         },
       },
@@ -40,6 +42,13 @@ export default async function ArticleDetailPage({
   }
 
   const scan = article.scanResult;
+  const aiPending = scan && scan.aiScore < 0; // -1 means export pending
+  const aiScore = aiPending ? 0 : (scan?.aiScore ?? 0);
+  const humanScore = aiPending ? 0 : (scan?.humanScore ?? 0);
+
+  // Separate internet vs database sources
+  const internetSources = scan?.sources.filter((s) => s.isInternetSource) ?? [];
+  const databaseSources = scan?.sources.filter((s) => !s.isInternetSource) ?? [];
 
   return (
     <div className="space-y-8">
@@ -96,21 +105,39 @@ export default async function ArticleDetailPage({
       {/* Scan Summary Cards */}
       {scan && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* AI Detection */}
           <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-            <ScoreGauge
-              score={scan.aiScore * 100}
-              label="AI Score"
-              invertColors
-              size="lg"
-            />
-            <div>
-              <p className="text-sm font-medium text-slate-300">AI Detection</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {(scan.aiScore * 100).toFixed(1)}% AI · {(scan.humanScore * 100).toFixed(1)}% Human
-              </p>
-            </div>
+            {aiPending ? (
+              <>
+                <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-slate-600">
+                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-300">AI Detection</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Analyzing... results pending
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <ScoreGauge
+                  score={aiScore * 100}
+                  label="AI Score"
+                  invertColors
+                  size="lg"
+                />
+                <div>
+                  <p className="text-sm font-medium text-slate-300">AI Detection</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {(aiScore * 100).toFixed(1)}% AI · {(humanScore * 100).toFixed(1)}% Human
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
+          {/* Plagiarism / Originality */}
           <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
             <ScoreGauge
               score={100 - scan.plagiarismScore}
@@ -126,6 +153,7 @@ export default async function ArticleDetailPage({
             </div>
           </div>
 
+          {/* Writing Quality */}
           <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
             <ScoreGauge
               score={scan.grammarScore ?? 0}
@@ -150,8 +178,6 @@ export default async function ArticleDetailPage({
       {scan?.pdfReportUrl && (
         <a
           href={scan.pdfReportUrl}
-          target="_blank"
-          rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-slate-700"
         >
           <Download className="h-4 w-4" />
@@ -204,20 +230,20 @@ export default async function ArticleDetailPage({
         </div>
       )}
 
-      {/* Plagiarism Sources */}
-      {scan && scan.sources.length > 0 && (
+      {/* Plagiarism Sources — Internet */}
+      {internetSources.length > 0 && (
         <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
           <h2 className="mb-4 text-lg font-semibold text-slate-100">
-            Plagiarism Sources ({scan.sources.length})
+            Internet Sources ({internetSources.length})
           </h2>
           <div className="space-y-2">
-            {scan.sources.map((source) => (
+            {internetSources.map((source) => (
               <div
                 key={source.id}
                 className="flex items-center justify-between rounded-lg border border-slate-700/50 p-3"
               >
                 <div className="flex items-center gap-3 overflow-hidden">
-                  <Globe className="h-4 w-4 shrink-0 text-slate-500" />
+                  <Globe className="h-4 w-4 shrink-0 text-teal-500" />
                   <div className="min-w-0">
                     <a
                       href={source.sourceUrl}
@@ -251,6 +277,52 @@ export default async function ArticleDetailPage({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Plagiarism Sources — Internal Database */}
+      {databaseSources.length > 0 && (
+        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+          <h2 className="mb-4 text-lg font-semibold text-slate-100">
+            Internal Database Matches ({databaseSources.length})
+          </h2>
+          <p className="mb-3 text-xs text-slate-500">
+            These matches are from Copyleaks&apos; shared document database, not public websites.
+          </p>
+          <div className="space-y-2">
+            {databaseSources.map((source) => (
+              <div
+                key={source.id}
+                className="flex items-center justify-between rounded-lg border border-slate-700/50 p-3"
+              >
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <Database className="h-4 w-4 shrink-0 text-slate-500" />
+                  <div className="min-w-0">
+                    <span className="block truncate text-sm text-slate-400">
+                      {source.sourceTitle || 'Internal Database Match'}
+                    </span>
+                  </div>
+                </div>
+                <div className="ml-4 shrink-0 text-right">
+                  <span className="text-sm font-semibold text-slate-400">
+                    {source.percentage.toFixed(1)}%
+                  </span>
+                  <p className="text-xs text-slate-500">
+                    {source.matchedWords} words
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* No sources but plagiarism score is 0 */}
+      {scan && scan.sources.length === 0 && scan.plagiarismScore === 0 && (
+        <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-6 text-center">
+          <p className="text-sm text-green-400">
+            ✅ No plagiarism sources detected — this content appears to be original.
+          </p>
         </div>
       )}
 

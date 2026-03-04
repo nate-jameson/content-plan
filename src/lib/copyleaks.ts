@@ -1,7 +1,7 @@
 // ============================================================
 // Copyleaks API Client
 // ============================================================
-// Handles authentication, scan submission, and result parsing.
+// Handles authentication, scan submission, export triggers, and result parsing.
 // Docs: https://docs.copyleaks.com/reference/actions/overview/
 
 const COPYLEAKS_API_BASE = 'https://api.copyleaks.com';
@@ -53,7 +53,7 @@ export async function getAccessToken(): Promise<string> {
 
 /**
  * Submit an article for a full authenticity scan.
- * Includes: plagiarism, AI detection, and writing feedback.
+ * Includes: plagiarism (internet only) and AI detection.
  * 
  * Results are delivered asynchronously via webhook.
  */
@@ -93,10 +93,9 @@ export async function submitScan(params: {
           // writingFeedback not available on current plan
           scanning: {
             internet: true,
-            copyleaksDb: {
-              includeMySubmissions: true,
-              includeOthersSubmissions: true,
-            },
+            // Disable internal DB matching to prevent self-matching false positives.
+            // Our articles were matching against our own previous submissions.
+            copyleaksDb: false,
           },
           sensitivityLevel: 3,
         },
@@ -106,24 +105,75 @@ export async function submitScan(params: {
 
   if (!response.ok) {
     const errorText = await response.text();
-    // Include debug info about what we sent
-    const debugInfo = {
-      url: `${COPYLEAKS_API_BASE}/v3/scans/submit/file/${params.scanId}`,
-      method: 'PUT',
-      hasBase64: typeof Buffer.from(params.text).toString('base64') === 'string',
-      base64Length: Buffer.from(params.text).toString('base64').length,
-      textLength: params.text.length,
-      bodyKeys: Object.keys(JSON.parse(JSON.stringify({
-        base64: Buffer.from(params.text).toString('base64'),
-        filename: 'article.txt',
-      }))),
-    };
-    throw new Error(`Copyleaks scan submission failed: ${response.status} ${errorText} | debug: ${JSON.stringify(debugInfo)}`);
+    throw new Error(`Copyleaks scan submission failed: ${response.status} ${errorText}`);
   }
 }
 
 /**
- * Download the PDF report for a completed scan.
+ * Trigger an export to get AI detection results and PDF report.
+ * Copyleaks pushes data to the specified endpoints asynchronously.
+ * 
+ * Call this AFTER the scan completed webhook is processed.
+ */
+export async function triggerExport(params: {
+  copyleaksScanId: string;
+  scanResultId: string;     // Our internal scan_result ID for routing
+  resultIds?: string[];      // Result IDs from the completed webhook (for detailed source data)
+}): Promise<void> {
+  const token = await getAccessToken();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://content.jmsn.com';
+  const exportId = `exp-${params.scanResultId.slice(-16)}-${Date.now().toString().slice(-6)}`;
+
+  const body: any = {
+    completionWebhook: `${baseUrl}/api/copyleaks-export/done/${params.copyleaksScanId}`,
+    maxRetries: 5,
+    developerPayload: params.scanResultId,
+    aiDetection: {
+      endpoint: `${baseUrl}/api/copyleaks-export/ai/${params.copyleaksScanId}`,
+      verb: 'POST',
+    },
+    pdfReport: {
+      endpoint: `${baseUrl}/api/copyleaks-export/pdf/${params.copyleaksScanId}`,
+      verb: 'POST',
+    },
+  };
+
+  // Include individual result downloads for detailed source data
+  if (params.resultIds && params.resultIds.length > 0) {
+    body.results = params.resultIds.slice(0, 50).map((id: string) => ({
+      id,
+      endpoint: `${baseUrl}/api/copyleaks-export/result/${params.copyleaksScanId}/${id}`,
+      verb: 'POST',
+    }));
+  }
+
+  console.log(`[Copyleaks Export] Triggering export ${exportId} for scan ${params.copyleaksScanId}`);
+
+  const response = await fetch(
+    `${COPYLEAKS_API_BASE}/v3/downloads/${params.copyleaksScanId}/export/${exportId}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[Copyleaks Export] Failed: ${response.status} ${errorText}`);
+    // Non-fatal — plagiarism results are already stored
+    throw new Error(`Export trigger failed: ${response.status} ${errorText}`);
+  }
+
+  console.log(`[Copyleaks Export] Export triggered successfully: ${exportId}`);
+}
+
+/**
+ * Download the PDF report for a completed scan (on-demand proxy).
+ * Used when user clicks "Download PDF" in the dashboard.
  */
 export async function downloadPdfReport(scanId: string): Promise<Buffer> {
   const token = await getAccessToken();
@@ -140,37 +190,6 @@ export async function downloadPdfReport(scanId: string): Promise<Buffer> {
   }
 
   return Buffer.from(await response.arrayBuffer());
-}
-
-/**
- * Export scan results in a structured format.
- * Use this for detailed drill-down data.
- */
-export async function exportResults(scanId: string): Promise<any> {
-  const token = await getAccessToken();
-
-  // Request full export with all result details
-  const response = await fetch(
-    `${COPYLEAKS_API_BASE}/v3/downloads/${scanId}/export`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        results: ['internet', 'database', 'batch'],
-        aiDetection: true,
-        writingFeedback: true,
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Export failed: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 /**
