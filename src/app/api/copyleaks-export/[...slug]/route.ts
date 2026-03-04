@@ -78,16 +78,20 @@ async function handleAiDetection(copyleaksScanId: string, request: NextRequest) 
 
   console.log(`[Copyleaks Export] AI: ${(aiScore * 100).toFixed(1)}% | Human: ${(humanScore * 100).toFixed(1)}%`);
 
-  // Update scan result with AI scores
+  // Store full AI detection response for detailed analysis
+  const explainData = body?.explain ?? null;
+
+  // Update scan result with AI scores and raw AI data
   await prisma.scanResult.update({
     where: { id: scanResult.id },
     data: {
       aiScore,
       humanScore,
+      rawResponse: body, // Store full AI response for explain patterns
     },
   });
 
-  // Create paragraph-level AI classifications
+  // Create paragraph-level AI classifications with REAL text
   const results = body?.results ?? [];
   if (results.length > 0) {
     // Delete any existing paragraphs for this scan
@@ -95,21 +99,42 @@ async function handleAiDetection(copyleaksScanId: string, request: NextRequest) 
       where: { scanResultId: scanResult.id },
     });
 
-    // Create new paragraph entries
+    // Fetch the original article content to extract real text segments
+    const article = scanResult.article;
+    const originalContent = article
+      ? (await prisma.article.findUnique({ where: { id: article.id }, select: { content: true } }))?.content
+      : null;
+
+    // Create new paragraph entries with actual text
     const paragraphs = results.map((result: any, index: number) => {
       const classification = result.classification === 2 ? 'ai' : 'human';
       const probability = result.probability ?? (classification === 'ai' ? 1 : 0);
       
-      // Extract text positions for context
-      const wordStart = result.matches?.[0]?.text?.words?.starts?.[0] ?? 0;
-      const wordLength = result.matches?.[0]?.text?.words?.lengths?.[0] ?? 0;
+      // Extract actual text using character positions from Copyleaks
+      let extractedText = '';
+      if (originalContent && result.matches?.length > 0) {
+        // Collect all character ranges for this result
+        const segments: string[] = [];
+        for (const match of result.matches) {
+          const starts = match?.text?.chars?.starts ?? [];
+          const lengths = match?.text?.chars?.lengths ?? [];
+          for (let i = 0; i < starts.length; i++) {
+            const start = starts[i];
+            const length = lengths[i] ?? 0;
+            if (start >= 0 && length > 0 && start + length <= originalContent.length) {
+              segments.push(originalContent.substring(start, start + length));
+            }
+          }
+        }
+        extractedText = segments.join(' ');
+      }
 
       return {
         scanResultId: scanResult.id,
         paragraphIndex: index,
         classification,
         aiProbability: probability,
-        text: `[Section ${index + 1}]`, // Placeholder — original text not in export payload
+        text: extractedText || `[Section ${index + 1} — text extraction pending]`,
       };
     });
 
@@ -117,7 +142,7 @@ async function handleAiDetection(copyleaksScanId: string, request: NextRequest) 
       data: paragraphs,
     });
 
-    console.log(`[Copyleaks Export] Created ${paragraphs.length} paragraph classifications`);
+    console.log(`[Copyleaks Export] Created ${paragraphs.length} paragraph classifications (${originalContent ? 'with' : 'without'} real text)`);
   }
 
   // Update writer aggregate stats with new AI score

@@ -78,7 +78,7 @@ async function handleSubmit() {
           sandbox: process.env.NODE_ENV !== 'production',
         });
 
-        // Update article status
+        // Update article status and store content for AI text extraction
         await prisma.article.update({
           where: { id: article.id },
           data: {
@@ -86,6 +86,7 @@ async function handleSubmit() {
             copyleaksScanId: scanId,
             submittedAt: new Date(),
             contentHash,
+            content, // Store for mapping Copyleaks char positions back to text
             wordCount: content.split(/\s+/).filter(Boolean).length,
           },
         });

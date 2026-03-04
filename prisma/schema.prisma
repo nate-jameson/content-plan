@@ -58,7 +58,8 @@ model Article {
   // Copyleaks tracking
   copyleaksScanId String?     @unique @map("copyleaks_scan_id")
   
-  // Content snapshot (for Copyleaks submission)
+  // Content snapshot (for AI text extraction & Copyleaks submission)
+  content       String?       @db.Text              // Full text submitted to Copyleaks
   contentHash   String?       @map("content_hash") // MD5 to detect re-edits
   lastModified  DateTime?     @map("last_modified")
 

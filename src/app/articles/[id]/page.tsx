@@ -13,6 +13,11 @@ import {
   Download,
   Database,
   Loader2,
+  AlertTriangle,
+  CheckCircle,
+  Bot,
+  User,
+  BarChart3,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -49,6 +54,49 @@ export default async function ArticleDetailPage({
   // Separate internet vs database sources
   const internetSources = scan?.sources.filter((s) => s.isInternetSource) ?? [];
   const databaseSources = scan?.sources.filter((s) => !s.isInternetSource) ?? [];
+
+  // AI paragraph stats
+  const aiParas = scan?.paragraphs ?? [];
+  const aiCount = aiParas.filter((p) => p.classification === 'ai').length;
+  const humanCount = aiParas.filter((p) => p.classification === 'human').length;
+  const mixedCount = aiParas.filter((p) => p.classification === 'mixed').length;
+  const totalParas = aiParas.length;
+
+  // Extract explain patterns from raw response
+  const rawResponse = scan?.rawResponse as any;
+  const explainPatterns = rawResponse?.explain?.patterns;
+
+  // Determine AI risk level
+  const aiPercent = aiScore * 100;
+  const riskLevel =
+    aiPercent >= 70 ? 'high' : aiPercent >= 40 ? 'medium' : 'low';
+  const riskConfig = {
+    high: {
+      color: 'red',
+      label: 'High AI Risk',
+      icon: AlertTriangle,
+      bg: 'bg-red-500/10 border-red-500/30',
+      text: 'text-red-400',
+      desc: 'This content has significant indicators of AI generation. Recommend thorough manual review and potential rewrite.',
+    },
+    medium: {
+      color: 'yellow',
+      label: 'Moderate AI Risk',
+      icon: AlertTriangle,
+      bg: 'bg-yellow-500/10 border-yellow-500/30',
+      text: 'text-yellow-400',
+      desc: 'Some sections show AI-like patterns. Review flagged paragraphs and consider targeted edits.',
+    },
+    low: {
+      color: 'green',
+      label: 'Low AI Risk',
+      icon: CheckCircle,
+      bg: 'bg-green-500/10 border-green-500/30',
+      text: 'text-green-400',
+      desc: 'Content appears predominantly human-written. Minor patterns detected are within normal range.',
+    },
+  };
+  const risk = riskConfig[riskLevel];
 
   return (
     <div className="space-y-8">
@@ -185,47 +233,245 @@ export default async function ArticleDetailPage({
         </a>
       )}
 
-      {/* Paragraph-level AI Detection */}
-      {scan && scan.paragraphs.length > 0 && (
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-          <h2 className="mb-4 text-lg font-semibold text-slate-100">
-            Paragraph-Level AI Detection
-          </h2>
-          <div className="space-y-3">
-            {scan.paragraphs.map((para) => (
-              <div
-                key={para.id}
-                className={`rounded-lg border p-4 text-sm leading-relaxed ${
-                  para.classification === 'ai'
-                    ? 'border-red-500/30 bg-red-500/5 text-red-200'
-                    : para.classification === 'mixed'
-                    ? 'border-yellow-500/30 bg-yellow-500/5 text-yellow-200'
-                    : 'border-green-500/30 bg-green-500/5 text-green-200'
-                }`}
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      para.classification === 'ai'
-                        ? 'bg-red-500/20 text-red-400'
-                        : para.classification === 'mixed'
-                        ? 'bg-yellow-500/20 text-yellow-400'
-                        : 'bg-green-500/20 text-green-400'
-                    }`}
+      {/* ========== AI DETECTION DEEP DIVE ========== */}
+      {scan && !aiPending && totalParas > 0 && (
+        <div className="space-y-6">
+          {/* Risk Assessment Banner */}
+          <div className={`rounded-xl border p-5 ${risk.bg}`}>
+            <div className="flex items-start gap-3">
+              <risk.icon className={`mt-0.5 h-5 w-5 shrink-0 ${risk.text}`} />
+              <div>
+                <h3 className={`text-sm font-semibold ${risk.text}`}>
+                  {risk.label} — {aiPercent.toFixed(0)}% AI Detected
+                </h3>
+                <p className="mt-1 text-sm text-slate-400">{risk.desc}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* AI Detection Breakdown */}
+          <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-100">
+                <BarChart3 className="h-5 w-5 text-teal-500" />
+                AI Detection Breakdown
+              </h2>
+              <span className="text-sm text-slate-500">
+                {totalParas} section{totalParas !== 1 ? 's' : ''} analyzed
+              </span>
+            </div>
+
+            {/* Visual breakdown bar */}
+            <div className="mb-4">
+              <div className="flex h-8 w-full overflow-hidden rounded-lg">
+                {aiCount > 0 && (
+                  <div
+                    className="flex items-center justify-center bg-red-500/80 text-xs font-medium text-white transition-all"
+                    style={{ width: `${(aiCount / totalParas) * 100}%` }}
                   >
-                    {para.classification === 'ai'
-                      ? '🤖 AI Generated'
-                      : para.classification === 'mixed'
-                      ? '🔄 Mixed'
-                      : '✍️ Human Written'}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    {(para.aiProbability * 100).toFixed(0)}% AI probability
+                    {aiCount > 0 && `${aiCount} AI`}
+                  </div>
+                )}
+                {mixedCount > 0 && (
+                  <div
+                    className="flex items-center justify-center bg-yellow-500/80 text-xs font-medium text-white transition-all"
+                    style={{ width: `${(mixedCount / totalParas) * 100}%` }}
+                  >
+                    {mixedCount > 0 && `${mixedCount} Mixed`}
+                  </div>
+                )}
+                {humanCount > 0 && (
+                  <div
+                    className="flex items-center justify-center bg-green-500/80 text-xs font-medium text-white transition-all"
+                    style={{ width: `${(humanCount / totalParas) * 100}%` }}
+                  >
+                    {humanCount > 0 && `${humanCount} Human`}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="mb-6 flex flex-wrap gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <Bot className="h-4 w-4 text-red-400" />
+                <span className="text-slate-400">
+                  <span className="font-semibold text-red-400">{aiCount}</span> AI-Generated Section{aiCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {mixedCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  <span className="text-slate-400">
+                    <span className="font-semibold text-yellow-400">{mixedCount}</span> Mixed
                   </span>
                 </div>
-                <p>{para.text || `[Paragraph ${para.paragraphIndex + 1}]`}</p>
+              )}
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-green-400" />
+                <span className="text-slate-400">
+                  <span className="font-semibold text-green-400">{humanCount}</span> Human-Written Section{humanCount !== 1 ? 's' : ''}
+                </span>
               </div>
-            ))}
+            </div>
+
+            {/* Paragraph-by-paragraph analysis */}
+            <div className="space-y-3">
+              {aiParas.map((para, idx) => {
+                const isAi = para.classification === 'ai';
+                const isMixed = para.classification === 'mixed';
+                const prob = para.aiProbability * 100;
+                const hasRealText = para.text && !para.text.startsWith('[Section');
+                
+                return (
+                  <div
+                    key={para.id}
+                    className={`rounded-lg border p-4 ${
+                      isAi
+                        ? 'border-red-500/30 bg-red-500/5'
+                        : isMixed
+                        ? 'border-yellow-500/30 bg-yellow-500/5'
+                        : 'border-green-500/30 bg-green-500/5'
+                    }`}
+                  >
+                    {/* Header row */}
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            isAi
+                              ? 'bg-red-500/20 text-red-400'
+                              : isMixed
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-green-500/20 text-green-400'
+                          }`}
+                        >
+                          {isAi ? (
+                            <Bot className="h-3 w-3" />
+                          ) : isMixed ? (
+                            <AlertTriangle className="h-3 w-3" />
+                          ) : (
+                            <User className="h-3 w-3" />
+                          )}
+                          {isAi ? 'AI Generated' : isMixed ? 'Mixed' : 'Human Written'}
+                        </span>
+                        <span className="text-xs text-slate-600">
+                          Section {idx + 1}
+                        </span>
+                      </div>
+                      
+                      {/* Confidence bar */}
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-700">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              isAi
+                                ? 'bg-red-500'
+                                : isMixed
+                                ? 'bg-yellow-500'
+                                : 'bg-green-500'
+                            }`}
+                            style={{ width: `${isAi || isMixed ? prob : 100 - prob}%` }}
+                          />
+                        </div>
+                        <span
+                          className={`text-xs font-medium tabular-nums ${
+                            isAi ? 'text-red-400' : isMixed ? 'text-yellow-400' : 'text-green-400'
+                          }`}
+                        >
+                          {prob.toFixed(0)}% AI
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Text content */}
+                    {hasRealText ? (
+                      <p className={`text-sm leading-relaxed ${
+                        isAi ? 'text-red-200/80' : isMixed ? 'text-yellow-200/80' : 'text-green-200/80'
+                      }`}>
+                        {para.text.length > 800
+                          ? para.text.substring(0, 800) + '…'
+                          : para.text}
+                      </p>
+                    ) : (
+                      <p className="text-xs italic text-slate-600">
+                        Text preview not available — content will appear for newly scanned articles
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* AI Pattern Analysis (if explain data available) */}
+          {explainPatterns?.statistics && (
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-100">
+                <Bot className="h-5 w-5 text-teal-500" />
+                AI Pattern Analysis
+              </h2>
+              <p className="mb-4 text-sm text-slate-500">
+                Copyleaks identified {explainPatterns.statistics.aiCount?.length ?? 0} writing patterns.
+                Each pattern&apos;s frequency is compared against known AI vs. human writing distributions.
+              </p>
+              <div className="space-y-2">
+                {(explainPatterns.statistics.aiCount as number[])?.map((aiFreq: number, i: number) => {
+                  const humanFreq = (explainPatterns.statistics.humanCount as number[])?.[i] ?? 0;
+                  const total = aiFreq + humanFreq;
+                  const aiPct = total > 0 ? (aiFreq / total) * 100 : 0;
+                  const isAiDominant = aiPct > 60;
+                  
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="w-20 shrink-0 text-right text-xs text-slate-500">
+                        Pattern {i + 1}
+                      </span>
+                      <div className="flex h-5 flex-1 overflow-hidden rounded bg-slate-700/50">
+                        <div
+                          className="bg-red-500/60 transition-all"
+                          style={{ width: `${aiPct}%` }}
+                          title={`AI: ${aiFreq.toFixed(1)} per 1M`}
+                        />
+                        <div
+                          className="bg-green-500/60 transition-all"
+                          style={{ width: `${100 - aiPct}%` }}
+                          title={`Human: ${humanFreq.toFixed(1)} per 1M`}
+                        />
+                      </div>
+                      <span className={`w-16 shrink-0 text-xs font-medium ${isAiDominant ? 'text-red-400' : 'text-green-400'}`}>
+                        {aiPct.toFixed(0)}% AI
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex gap-4 text-xs text-slate-600">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-sm bg-red-500/60" /> AI pattern frequency
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-sm bg-green-500/60" /> Human pattern frequency
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* AI Pending message */}
+      {scan && aiPending && (
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-6">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+            <div>
+              <p className="text-sm font-medium text-blue-300">
+                AI Detection Analysis in Progress
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Copyleaks is analyzing this content for AI-generated patterns. Results typically arrive within 2-5 minutes.
+              </p>
+            </div>
           </div>
         </div>
       )}
