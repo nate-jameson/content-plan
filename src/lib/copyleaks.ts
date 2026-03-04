@@ -90,9 +90,7 @@ export async function submitScan(params: {
           aiGeneratedText: {
             detect: true,
           },
-          writingFeedback: {
-            enable: true,
-          },
+          // writingFeedback not available on current plan
           scanning: {
             internet: true,
             copyleaksDb: {
