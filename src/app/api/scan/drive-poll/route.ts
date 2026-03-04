@@ -3,11 +3,15 @@
 // ============================================================
 // Called on schedule (cron) to check all active writer folders
 // for new or updated Google Docs.
+//
+// IMPORTANT: Only re-queues COMPLETED articles when the Google
+// Drive modifiedTime actually changes (meaning the doc was edited).
+// Uses lastModified timestamp comparison, NOT contentHash
+// (which gets overwritten by the submit route with content-based hash).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { listDocsInFolder } from '@/lib/google-drive';
-import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -40,7 +44,7 @@ export async function GET(request: NextRequest) {
         // Get existing articles for this writer
         const existingArticles = await prisma.article.findMany({
           where: { writerId: writer.id },
-          select: { googleDocId: true, contentHash: true, lastModified: true },
+          select: { googleDocId: true, status: true, lastModified: true },
         });
 
         const existingMap = new Map(
@@ -49,10 +53,7 @@ export async function GET(request: NextRequest) {
 
         for (const doc of docs) {
           const existing = existingMap.get(doc.id);
-          const modifiedHash = crypto
-            .createHash('md5')
-            .update(doc.modifiedTime)
-            .digest('hex');
+          const driveModifiedTime = new Date(doc.modifiedTime);
 
           if (!existing) {
             // New document — insert as DETECTED
@@ -64,24 +65,30 @@ export async function GET(request: NextRequest) {
                 driveUrl: doc.webViewLink,
                 status: 'DETECTED',
                 detectedAt: new Date(),
-                contentHash: modifiedHash,
-                lastModified: new Date(doc.modifiedTime),
+                lastModified: driveModifiedTime,
               },
             });
             totalNew++;
-          } else if (existing.contentHash !== modifiedHash) {
-            // Document was edited — queue for re-scan
+          } else if (
+            // Only re-queue if:
+            // 1. Article is COMPLETED or ERROR (not already in progress)
+            // 2. The Google Drive modifiedTime actually changed (doc was edited)
+            (existing.status === 'COMPLETED' || existing.status === 'ERROR') &&
+            existing.lastModified &&
+            driveModifiedTime.getTime() !== existing.lastModified.getTime()
+          ) {
             await prisma.article.update({
               where: { googleDocId: doc.id },
               data: {
                 title: doc.name,
                 status: 'QUEUED',
-                contentHash: modifiedHash,
-                lastModified: new Date(doc.modifiedTime),
+                lastModified: driveModifiedTime,
               },
             });
             totalUpdated++;
+            console.log(`[Drive Poll] Re-queued "${doc.name}" — doc was edited in Drive`);
           }
+          // Skip articles in DETECTED, QUEUED, or SCANNING status — already in pipeline
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -91,6 +98,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Auto-submit any pending articles to Copyleaks
+    // Only call submit if there's actually new/updated work
     let totalSubmitted = 0;
     if (totalNew > 0 || totalUpdated > 0) {
       try {

@@ -4,6 +4,10 @@
 // Finds all DETECTED/QUEUED articles, downloads content from
 // Google Drive, and submits to Copyleaks for scanning.
 // Rate limited to max 5 submissions per call.
+//
+// OPTIMIZATION: Checks for pending articles BEFORE authenticating
+// to Copyleaks. This avoids burning API logins (~192/day) when
+// there's no work to do.
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
@@ -27,7 +31,22 @@ export async function POST() {
 
 async function handleSubmit() {
   try {
-    // Find articles ready for submission
+    // Check for pending work BEFORE doing anything expensive
+    const pendingCount = await prisma.article.count({
+      where: {
+        status: { in: ['DETECTED', 'QUEUED'] },
+      },
+    });
+
+    if (pendingCount === 0) {
+      return NextResponse.json({
+        success: true,
+        submitted: 0,
+        message: 'No articles pending submission',
+      });
+    }
+
+    // Only now fetch articles and proceed with Copyleaks
     const articles = await prisma.article.findMany({
       where: {
         status: { in: ['DETECTED', 'QUEUED'] },
@@ -36,14 +55,6 @@ async function handleSubmit() {
       take: MAX_SUBMISSIONS_PER_CALL,
       include: { writer: { select: { name: true } } },
     });
-
-    if (articles.length === 0) {
-      return NextResponse.json({
-        success: true,
-        submitted: 0,
-        message: 'No articles pending submission',
-      });
-    }
 
     const results: Array<{ articleId: string; title: string; status: string }> = [];
     const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/copyleaks-webhook`;
@@ -63,7 +74,7 @@ async function handleSubmit() {
         const shortId = crypto.randomUUID().replace(/-/g, '').slice(0, 32);
         const scanId = `cr-${shortId}`;
 
-        // Update content hash based on actual content
+        // Store content hash based on actual content
         const contentHash = crypto
           .createHash('md5')
           .update(content)
@@ -79,6 +90,9 @@ async function handleSubmit() {
         });
 
         // Update article status and store content for AI text extraction
+        // NOTE: We update contentHash here but drive-poll now uses
+        // lastModified (Drive timestamp) for change detection, so
+        // this won't cause re-queuing loops.
         await prisma.article.update({
           where: { id: article.id },
           data: {
