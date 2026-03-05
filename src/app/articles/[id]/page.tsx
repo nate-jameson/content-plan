@@ -250,11 +250,12 @@ export default async function ArticleDetailPage({
             )}
           </div>
 
-          {/* Plagiarism / Originality */}
+          {/* Plagiarism */}
           <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/60 p-6">
             <ScoreGauge
-              score={100 - scan.plagiarismScore}
-              label="Originality"
+              score={scan.plagiarismScore}
+              label="Plagiarism"
+              invertColors
               size="lg"
             />
             <div>

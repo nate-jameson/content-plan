@@ -137,13 +137,9 @@ export default async function WriterDetailPage({
               size="md"
             />
             <ScoreGauge
-              score={100 - writer.avgPlagiarism}
-              label="Originality"
-              size="md"
-            />
-            <ScoreGauge
-              score={writer.avgGrammarScore}
-              label="Grammar"
+              score={writer.avgPlagiarism}
+              label="Plagiarism"
+              invertColors
               size="md"
             />
           </div>
