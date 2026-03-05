@@ -115,7 +115,7 @@ export default async function ArticleDetailPage({
   const paragraphRanges: Array<{ startChar: number; endChar: number; classification: string; aiProbability: number }> = [];
   if (cleanContent && aiParas.length > 0) {
     for (const para of aiParas) {
-      const paraText = (para.text ?? '').replace(/^\uFEFF/, '');
+      const paraText = (para.text ?? '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
       if (!paraText || paraText.startsWith('[Section')) continue;
       const idx = cleanContent.indexOf(paraText, paragraphRanges.length > 0 ? paragraphRanges[paragraphRanges.length - 1]?.endChar ?? 0 : 0);
       if (idx >= 0) {
