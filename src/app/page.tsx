@@ -57,7 +57,6 @@ async function getDashboardData() {
     pendingReview,
     avgAiScore: avgScores._avg.aiScore ?? 0,
     avgPlagiarism: avgScores._avg.plagiarismScore ?? 0,
-    avgGrammar: avgScores._avg.grammarScore ?? 0,
     writers,
     recentArticles,
   };
@@ -124,7 +123,6 @@ export default async function DashboardPage() {
                   <th className="pb-3 pr-4 font-medium text-center">Articles</th>
                   <th className="pb-3 pr-4 font-medium text-center">Avg AI %</th>
                   <th className="pb-3 pr-4 font-medium text-center">Avg Plagiarism %</th>
-                  <th className="pb-3 pr-4 font-medium text-center">Avg Grammar</th>
                   <th className="pb-3 font-medium text-center">Status</th>
                 </tr>
               </thead>
@@ -171,19 +169,6 @@ export default async function DashboardPage() {
                         {writer.avgPlagiarism.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="py-3 pr-4 text-center">
-                      <span
-                        className={
-                          writer.avgGrammarScore >= 80
-                            ? 'text-green-400'
-                            : writer.avgGrammarScore >= 50
-                            ? 'text-yellow-400'
-                            : 'text-red-400'
-                        }
-                      >
-                        {writer.avgGrammarScore.toFixed(0)}
-                      </span>
-                    </td>
                     <td className="py-3 text-center">
                       <span
                         className={`inline-block h-2 w-2 rounded-full ${
@@ -195,7 +180,7 @@ export default async function DashboardPage() {
                 ))}
                 {data.writers.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500">
+                    <td colSpan={5} className="py-8 text-center text-slate-500">
                       No writers added yet.{' '}
                       <Link href="/writers" className="text-teal-500 hover:underline">
                         Add your first writer
@@ -240,9 +225,6 @@ export default async function DashboardPage() {
                     <span>
                       Plag: {article.scanResult.plagiarismScore.toFixed(1)}%
                     </span>
-                    {article.scanResult.grammarScore != null && (
-                      <span>Grammar: {article.scanResult.grammarScore.toFixed(0)}</span>
-                    )}
                   </div>
                 )}
               </Link>

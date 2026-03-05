@@ -80,7 +80,6 @@ export default async function ArticlesPage({
                 <th className="p-4 font-medium text-center">Status</th>
                 <th className="p-4 font-medium text-center">AI %</th>
                 <th className="p-4 font-medium text-center">Plagiarism %</th>
-                <th className="p-4 font-medium text-center">Grammar</th>
                 <th className="p-4 font-medium">Detected</th>
               </tr>
             </thead>
@@ -119,11 +118,6 @@ export default async function ArticlesPage({
                       ? `${article.scanResult.plagiarismScore.toFixed(1)}%`
                       : '—'}
                   </td>
-                  <td className="p-4 text-center text-slate-300">
-                    {article.scanResult?.grammarScore != null
-                      ? article.scanResult.grammarScore.toFixed(0)
-                      : '—'}
-                  </td>
                   <td className="p-4 text-slate-500">
                     {formatDistanceToNow(new Date(article.detectedAt), {
                       addSuffix: true,
@@ -133,7 +127,7 @@ export default async function ArticlesPage({
               ))}
               {articles.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                  <td colSpan={6} className="p-8 text-center text-slate-500">
                     <FileText className="mx-auto mb-2 h-8 w-8 text-slate-600" />
                     {status
                       ? `No articles with status "${status}"`

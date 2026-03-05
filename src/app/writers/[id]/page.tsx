@@ -96,13 +96,9 @@ export default async function WriterDetailPage({
               size="md"
             />
             <ScoreGauge
-              score={100 - writer.avgPlagiarism}
-              label="Originality"
-              size="md"
-            />
-            <ScoreGauge
-              score={writer.avgGrammarScore}
-              label="Grammar"
+              score={writer.avgPlagiarism}
+              label="Plagiarism"
+              invertColors
               size="md"
             />
           </div>
@@ -151,7 +147,6 @@ export default async function WriterDetailPage({
                 <th className="pb-3 pr-4 font-medium text-center">Status</th>
                 <th className="pb-3 pr-4 font-medium text-center">AI %</th>
                 <th className="pb-3 pr-4 font-medium text-center">Plagiarism %</th>
-                <th className="pb-3 pr-4 font-medium text-center">Grammar</th>
                 <th className="pb-3 font-medium">Detected</th>
               </tr>
             </thead>
@@ -182,11 +177,6 @@ export default async function WriterDetailPage({
                       ? `${article.scanResult.plagiarismScore.toFixed(1)}%`
                       : '—'}
                   </td>
-                  <td className="py-3 pr-4 text-center text-slate-300">
-                    {article.scanResult?.grammarScore != null
-                      ? article.scanResult.grammarScore.toFixed(0)
-                      : '—'}
-                  </td>
                   <td className="py-3 text-slate-500">
                     {formatDistanceToNow(new Date(article.detectedAt), {
                       addSuffix: true,
@@ -197,7 +187,7 @@ export default async function WriterDetailPage({
               {writer.articles.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="py-8 text-center text-slate-500"
                   >
                     No articles detected for this writer yet

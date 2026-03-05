@@ -243,9 +243,6 @@ export async function addScanResultComment(
     `🤖 AI Detection: ${(results.aiScore * 100).toFixed(0)}% AI-generated`,
   ];
 
-  if (results.grammarScore !== null) {
-    lines.push(`✍️ Writing Quality: ${results.grammarScore.toFixed(0)}/100`);
-  }
   if (results.readabilityGrade) {
     lines.push(`📖 Readability: ${results.readabilityGrade}`);
   }

@@ -255,15 +255,16 @@ export default async function ArticleDetailPage({
             )}
           </div>
 
-          {/* Plagiarism / Originality */}
+          {/* Plagiarism */}
           <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
             <ScoreGauge
-              score={100 - scan.plagiarismScore}
-              label="Originality"
+              score={scan.plagiarismScore}
+              label="Plagiarism"
+              invertColors
               size="lg"
             />
             <div>
-              <p className="text-sm font-medium text-slate-300">Plagiarism</p>
+              <p className="text-sm font-medium text-slate-300">Plagiarism Detected</p>
               <p className="mt-1 text-xs text-slate-500">
                 {scan.plagiarismScore.toFixed(1)}% matched ·{' '}
                 {scan.matchedWords}/{scan.totalWords} words
@@ -271,15 +272,10 @@ export default async function ArticleDetailPage({
             </div>
           </div>
 
-          {/* Writing Quality */}
+          {/* Reading Stats */}
           <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-            <ScoreGauge
-              score={scan.grammarScore ?? 0}
-              label="Grammar"
-              size="lg"
-            />
             <div>
-              <p className="text-sm font-medium text-slate-300">Writing Quality</p>
+              <p className="text-sm font-medium text-slate-300">Reading Stats</p>
               <p className="mt-1 text-xs text-slate-500">
                 {scan.readabilityGrade
                   ? `${scan.readabilityGrade} level`
