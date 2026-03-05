@@ -68,9 +68,36 @@ export default async function ArticleDetailPage({
   const explainPatterns = rawResponse?.explain?.patterns;
   const articleContent = article.content ?? '';
 
-  // Extract actual flagged phrases from character positions, snapping to word boundaries
+  // Extract actual flagged phrases using word positions (more reliable than char positions)
+  // Copyleaks provides words.starts (word index) and words.lengths (word count) which avoid
+  // offset issues from BOM characters, \r line endings, etc.
   const explainPhrases: { phrase: string; ratio: number; aiFreq: number; humanFreq: number }[] = [];
-  if (explainPatterns?.text?.chars?.starts && articleContent) {
+  const contentWords = articleContent ? articleContent.split(/\s+/).filter(w => w.length > 0) : [];
+  
+  if (explainPatterns?.text?.words?.starts && contentWords.length > 0) {
+    const wordStarts = explainPatterns.text.words.starts as number[];
+    const wordLengths = explainPatterns.text.words.lengths as number[];
+    const proportions = (explainPatterns.statistics?.proportion as number[]) ?? [];
+    const aiCounts = (explainPatterns.statistics?.aiCount as number[]) ?? [];
+    const humanCounts = (explainPatterns.statistics?.humanCount as number[]) ?? [];
+
+    for (let i = 0; i < wordStarts.length; i++) {
+      const ws = wordStarts[i];
+      const wl = wordLengths[i] ?? 1;
+      const phraseWords = contentWords.slice(ws, ws + wl);
+      const phrase = phraseWords.join(' ');
+
+      if (phrase.length > 0) {
+        explainPhrases.push({
+          phrase,
+          ratio: proportions[i] ?? 0,
+          aiFreq: aiCounts[i] ?? 0,
+          humanFreq: humanCounts[i] ?? 0,
+        });
+      }
+    }
+  } else if (explainPatterns?.text?.chars?.starts && articleContent) {
+    // Fallback to character-based extraction with word-boundary snapping
     const starts = explainPatterns.text.chars.starts as number[];
     const lengths = explainPatterns.text.chars.lengths as number[];
     const proportions = (explainPatterns.statistics?.proportion as number[]) ?? [];
@@ -81,16 +108,8 @@ export default async function ArticleDetailPage({
       let start = starts[i];
       const len = lengths[i] ?? 0;
       let end = start + len;
-
-      // Snap start backward to word boundary (space, newline, or start of string)
-      while (start > 0 && !/[\s\n\r]/.test(articleContent[start - 1])) {
-        start--;
-      }
-      // Snap end forward to word boundary
-      while (end < articleContent.length && !/[\s\n\r.,;:!?)]/.test(articleContent[end])) {
-        end++;
-      }
-
+      while (start > 0 && !/[\s\n\r]/.test(articleContent[start - 1])) start--;
+      while (end < articleContent.length && !/[\s\n\r.,;:!?)]/.test(articleContent[end])) end++;
       const phrase = articleContent.substring(start, end).trim();
       if (phrase.length > 0) {
         explainPhrases.push({
