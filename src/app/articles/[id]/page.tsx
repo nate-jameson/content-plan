@@ -62,9 +62,23 @@ export default async function ArticleDetailPage({
   const mixedCount = aiParas.filter((p) => p.classification === 'mixed').length;
   const totalParas = aiParas.length;
 
-  // Extract explain patterns from raw response
+  // Extract explain patterns from raw response and resolve actual text phrases
   const rawResponse = scan?.rawResponse as any;
   const explainPatterns = rawResponse?.explain?.patterns;
+  const articleContent = article.content ?? '';
+
+  // Extract actual flagged phrases from character positions
+  const explainPhrases: string[] = [];
+  if (explainPatterns?.text?.chars?.starts && articleContent) {
+    const starts = explainPatterns.text.chars.starts as number[];
+    const lengths = explainPatterns.text.chars.lengths as number[];
+    for (let i = 0; i < starts.length; i++) {
+      const start = starts[i];
+      const len = lengths[i] ?? 0;
+      const phrase = articleContent.substring(start, start + len).trim();
+      explainPhrases.push(phrase || `[Position ${start}]`);
+    }
+  }
 
   // Determine AI risk level
   const aiPercent = aiScore * 100;
@@ -412,46 +426,67 @@ export default async function ArticleDetailPage({
                 AI Pattern Analysis
               </h2>
               <p className="mb-4 text-sm text-slate-500">
-                Copyleaks identified {explainPatterns.statistics.aiCount?.length ?? 0} writing patterns.
-                Each pattern&apos;s frequency is compared against known AI vs. human writing distributions.
+                Copyleaks identified {explainPatterns.statistics.aiCount?.length ?? 0} phrases that statistically appear more often in AI-generated writing.
+                Higher ratios indicate stronger AI signals.
               </p>
-              <div className="space-y-2">
-                {(explainPatterns.statistics.aiCount as number[])?.map((aiFreq: number, i: number) => {
+              <div className="space-y-3">
+                {(explainPatterns.statistics.proportion as number[])
+                  ?.map((ratio: number, i: number) => ({ ratio, index: i }))
+                  .sort((a: { ratio: number }, b: { ratio: number }) => b.ratio - a.ratio)
+                  .map(({ ratio, index: i }: { ratio: number; index: number }) => {
+                  const aiFreq = (explainPatterns.statistics.aiCount as number[])?.[i] ?? 0;
                   const humanFreq = (explainPatterns.statistics.humanCount as number[])?.[i] ?? 0;
                   const total = aiFreq + humanFreq;
                   const aiPct = total > 0 ? (aiFreq / total) * 100 : 0;
-                  const isAiDominant = aiPct > 60;
+                  const isHighRatio = ratio >= 10;
+                  const isMedRatio = ratio >= 5;
+                  const phrase = explainPhrases[i] ?? `Pattern ${i + 1}`;
                   
                   return (
-                    <div key={i} className="flex items-center gap-3">
-                      <span className="w-20 shrink-0 text-right text-xs text-slate-500">
-                        Pattern {i + 1}
-                      </span>
-                      <div className="flex h-5 flex-1 overflow-hidden rounded bg-slate-700/50">
-                        <div
-                          className="bg-red-500/60 transition-all"
-                          style={{ width: `${aiPct}%` }}
-                          title={`AI: ${aiFreq.toFixed(1)} per 1M`}
-                        />
-                        <div
-                          className="bg-green-500/60 transition-all"
-                          style={{ width: `${100 - aiPct}%` }}
-                          title={`Human: ${humanFreq.toFixed(1)} per 1M`}
-                        />
+                    <div key={i} className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
+                      <div className="mb-2 flex items-start justify-between gap-3">
+                        <code className={`text-sm font-medium ${
+                          isHighRatio ? 'text-red-300' : isMedRatio ? 'text-yellow-300' : 'text-slate-300'
+                        }`}>
+                          &ldquo;{phrase}&rdquo;
+                        </code>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+                          isHighRatio
+                            ? 'bg-red-500/20 text-red-400'
+                            : isMedRatio
+                            ? 'bg-yellow-500/20 text-yellow-400'
+                            : 'bg-slate-600/30 text-slate-400'
+                        }`}>
+                          {ratio.toFixed(1)}× more likely AI
+                        </span>
                       </div>
-                      <span className={`w-16 shrink-0 text-xs font-medium ${isAiDominant ? 'text-red-400' : 'text-green-400'}`}>
-                        {aiPct.toFixed(0)}% AI
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-3 flex-1 overflow-hidden rounded bg-slate-700/50">
+                          <div
+                            className="bg-red-500/60 transition-all"
+                            style={{ width: `${aiPct}%` }}
+                            title={`AI: ${aiFreq.toFixed(1)} per 1M texts`}
+                          />
+                          <div
+                            className="bg-green-500/60 transition-all"
+                            style={{ width: `${100 - aiPct}%` }}
+                            title={`Human: ${humanFreq.toFixed(1)} per 1M texts`}
+                          />
+                        </div>
+                        <span className="w-24 shrink-0 text-right text-xs text-slate-500">
+                          AI {aiFreq.toFixed(1)} · H {humanFreq.toFixed(1)}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
               </div>
-              <div className="mt-3 flex gap-4 text-xs text-slate-600">
+              <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-600">
                 <span className="flex items-center gap-1">
-                  <span className="inline-block h-2 w-2 rounded-sm bg-red-500/60" /> AI pattern frequency
+                  <span className="inline-block h-2 w-2 rounded-sm bg-red-500/60" /> Frequency in AI writing (per 1M texts)
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block h-2 w-2 rounded-sm bg-green-500/60" /> Human pattern frequency
+                  <span className="inline-block h-2 w-2 rounded-sm bg-green-500/60" /> Frequency in human writing (per 1M texts)
                 </span>
               </div>
             </div>
