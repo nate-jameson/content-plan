@@ -39,7 +39,6 @@ export default async function WriterDetailPage({
             select: {
               plagiarismScore: true,
               aiScore: true,
-              grammarScore: true,
             },
           },
         },
@@ -51,7 +50,10 @@ export default async function WriterDetailPage({
     notFound();
   }
 
-  const flaggedCount = writer.articles.filter(
+  const activeArticles = writer.articles.filter(a => a.status !== 'ARCHIVED');
+  const archivedArticles = writer.articles.filter(a => a.status === 'ARCHIVED');
+
+  const flaggedCount = activeArticles.filter(
     (a) => a.status === 'FLAGGED'
   ).length;
 
@@ -148,7 +150,7 @@ export default async function WriterDetailPage({
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Total Articles" value={writer.articles.length} />
+        <StatCard label="Total Articles" value={activeArticles.length} />
         <StatCard
           label="Avg AI Score"
           value={`${(writer.avgAiScore * 100).toFixed(0)}%`}
@@ -190,7 +192,7 @@ export default async function WriterDetailPage({
       {/* Article List */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
         <h2 className="mb-4 text-lg font-semibold text-slate-200">
-          Articles ({writer.articles.length})
+          Articles ({activeArticles.length})
         </h2>
 
         <div className="overflow-x-auto">
@@ -201,12 +203,11 @@ export default async function WriterDetailPage({
                 <th className="pb-3 pr-4 font-medium text-center">Status</th>
                 <th className="pb-3 pr-4 font-medium text-center">AI %</th>
                 <th className="pb-3 pr-4 font-medium text-center">Plagiarism %</th>
-                <th className="pb-3 pr-4 font-medium text-center">Grammar</th>
                 <th className="pb-3 font-medium">Detected</th>
               </tr>
             </thead>
             <tbody>
-              {writer.articles.map((article) => {
+              {activeArticles.map((article) => {
                 const level = article.aiDetectionLevel ?? 2;
                 return (
                   <tr
@@ -239,11 +240,6 @@ export default async function WriterDetailPage({
                         ? `${article.scanResult.plagiarismScore.toFixed(1)}%`
                         : '—'}
                     </td>
-                    <td className="py-3 pr-4 text-center text-slate-300">
-                      {article.scanResult?.grammarScore != null
-                        ? article.scanResult.grammarScore.toFixed(0)
-                        : '—'}
-                    </td>
                     <td className="py-3 text-slate-500">
                       {formatDistanceToNow(new Date(article.detectedAt), {
                         addSuffix: true,
@@ -252,10 +248,10 @@ export default async function WriterDetailPage({
                   </tr>
                 );
               })}
-              {writer.articles.length === 0 && (
+              {activeArticles.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="py-8 text-center text-slate-500"
                   >
                     No articles detected for this writer yet
@@ -266,6 +262,56 @@ export default async function WriterDetailPage({
           </table>
         </div>
       </div>
+
+      {/* Archived Articles */}
+      {archivedArticles.length > 0 && (
+        <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 p-6">
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-slate-400 hover:text-slate-300">
+              📦 Archived Articles ({archivedArticles.length})
+            </summary>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-700 text-left text-slate-400">
+                    <th className="pb-3 pr-4 font-medium">Title</th>
+                    <th className="pb-3 pr-4 font-medium text-center">Status</th>
+                    <th className="pb-3 pr-4 font-medium text-center">AI %</th>
+                    <th className="pb-3 pr-4 font-medium text-center">Plagiarism %</th>
+                    <th className="pb-3 font-medium">Detected</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archivedArticles.map((article) => {
+                    const level = article.aiDetectionLevel ?? 2;
+                    return (
+                      <tr key={article.id} className="border-b border-slate-700/50 opacity-60">
+                        <td className="py-3 pr-4">
+                          <Link href={`/articles/${article.id}`} className="font-medium text-slate-300 hover:text-teal-400">
+                            {article.title}
+                          </Link>
+                        </td>
+                        <td className="py-3 pr-4 text-center">
+                          <StatusBadge status={article.status} />
+                        </td>
+                        <td className="py-3 pr-4 text-center text-slate-400">
+                          {article.scanResult ? `${(article.scanResult.aiScore * 100).toFixed(0)}%` : '—'}
+                        </td>
+                        <td className="py-3 pr-4 text-center text-slate-400">
+                          {article.scanResult ? `${article.scanResult.plagiarismScore.toFixed(1)}%` : '—'}
+                        </td>
+                        <td className="py-3 text-slate-500">
+                          {formatDistanceToNow(new Date(article.detectedAt), { addSuffix: true })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      )}
     </div>
   );
 }

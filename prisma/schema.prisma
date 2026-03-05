@@ -81,6 +81,7 @@ enum ArticleStatus {
   APPROVED    // Passed review
   FLAGGED     // Needs writer revision
   ERROR       // Scan failed
+  ARCHIVED    // Removed from Drive folder or manually archived
 }
 
 // ============================================================

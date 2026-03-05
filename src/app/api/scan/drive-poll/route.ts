@@ -90,6 +90,24 @@ export async function GET(request: NextRequest) {
           }
           // Skip articles in DETECTED, QUEUED, or SCANNING status — already in pipeline
         }
+
+        // Auto-archive: articles in DB but no longer in the Drive folder
+        const driveDocIds = new Set(docs.map(d => d.id));
+        const articlesToArchive = existingArticles.filter(
+          (a) => !driveDocIds.has(a.googleDocId) && a.status !== 'ARCHIVED'
+        );
+
+        if (articlesToArchive.length > 0) {
+          await prisma.article.updateMany({
+            where: {
+              writerId: writer.id,
+              googleDocId: { in: articlesToArchive.map(a => a.googleDocId) },
+              status: { not: 'ARCHIVED' },
+            },
+            data: { status: 'ARCHIVED' },
+          });
+          console.log(`[Drive Poll] Auto-archived ${articlesToArchive.length} articles no longer in folder for "${writer.name}"`);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         errors.push(`Writer "${writer.name}": ${message}`);

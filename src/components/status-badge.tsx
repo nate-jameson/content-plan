@@ -37,6 +37,10 @@ const statusConfig: Record<
     label: 'Error',
     className: 'bg-red-400/10 text-red-300 border-red-500/20',
   },
+  ARCHIVED: {
+    label: 'Archived',
+    className: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  },
 };
 
 interface StatusBadgeProps {

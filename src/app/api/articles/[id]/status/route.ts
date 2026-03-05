@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 
 const VALID_STATUSES = [
   'DETECTED', 'QUEUED', 'SCANNING', 'COMPLETED',
-  'REVIEWED', 'APPROVED', 'FLAGGED', 'ERROR',
+  'REVIEWED', 'APPROVED', 'FLAGGED', 'ERROR', 'ARCHIVED',
 ] as const;
 
 export async function POST(

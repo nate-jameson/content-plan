@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Check, Flag, RotateCcw, RefreshCw } from 'lucide-react';
+import { Check, Flag, RotateCcw, RefreshCw, Archive } from 'lucide-react';
 import type { ArticleStatus } from '@/types';
 
 export function ArticleActions({
@@ -96,6 +96,16 @@ export function ArticleActions({
         >
           <RefreshCw className={`h-4 w-4 ${loading === 'RESCAN' ? 'animate-spin' : ''}`} />
           {loading === 'RESCAN' ? 'Rescanning…' : 'Rescan at Level 3'}
+        </button>
+      )}
+      {currentStatus !== 'ARCHIVED' && (
+        <button
+          onClick={() => updateStatus('ARCHIVED')}
+          disabled={loading !== null}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-600/50 disabled:opacity-50"
+        >
+          <Archive className="h-4 w-4" />
+          {loading === 'ARCHIVED' ? 'Archiving…' : 'Archive'}
         </button>
       )}
     </div>

@@ -44,7 +44,8 @@ export type ArticleStatus =
   | 'REVIEWED'
   | 'APPROVED'
   | 'FLAGGED'
-  | 'ERROR';
+  | 'ERROR'
+  | 'ARCHIVED';
 
 // Compact scan data for article list cards
 export interface ScanSummary {
