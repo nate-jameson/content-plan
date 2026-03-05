@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { StatusBadge } from '@/components/status-badge';
 import { ScoreGauge } from '@/components/score-gauge';
 import { ArticleActions } from './article-actions';
+import { HighlightedArticle } from './highlighted-article';
 import { format } from 'date-fns';
 import {
   ArrowLeft,
@@ -67,16 +68,38 @@ export default async function ArticleDetailPage({
   const explainPatterns = rawResponse?.explain?.patterns;
   const articleContent = article.content ?? '';
 
-  // Extract actual flagged phrases from character positions
-  const explainPhrases: string[] = [];
+  // Extract actual flagged phrases from character positions, snapping to word boundaries
+  const explainPhrases: { phrase: string; ratio: number; aiFreq: number; humanFreq: number }[] = [];
   if (explainPatterns?.text?.chars?.starts && articleContent) {
     const starts = explainPatterns.text.chars.starts as number[];
     const lengths = explainPatterns.text.chars.lengths as number[];
+    const proportions = (explainPatterns.statistics?.proportion as number[]) ?? [];
+    const aiCounts = (explainPatterns.statistics?.aiCount as number[]) ?? [];
+    const humanCounts = (explainPatterns.statistics?.humanCount as number[]) ?? [];
+
     for (let i = 0; i < starts.length; i++) {
-      const start = starts[i];
+      let start = starts[i];
       const len = lengths[i] ?? 0;
-      const phrase = articleContent.substring(start, start + len).trim();
-      explainPhrases.push(phrase || `[Position ${start}]`);
+      let end = start + len;
+
+      // Snap start backward to word boundary (space, newline, or start of string)
+      while (start > 0 && !/[\s\n\r]/.test(articleContent[start - 1])) {
+        start--;
+      }
+      // Snap end forward to word boundary
+      while (end < articleContent.length && !/[\s\n\r.,;:!?)]/.test(articleContent[end])) {
+        end++;
+      }
+
+      const phrase = articleContent.substring(start, end).trim();
+      if (phrase.length > 0) {
+        explainPhrases.push({
+          phrase,
+          ratio: proportions[i] ?? 0,
+          aiFreq: aiCounts[i] ?? 0,
+          humanFreq: humanCounts[i] ?? 0,
+        });
+      }
     }
   }
 
@@ -345,69 +368,16 @@ export default async function ArticleDetailPage({
                   </span>
                 </div>
               </div>
-              <div className="prose prose-sm prose-invert max-w-none space-y-0">
-                {aiParas.map((para, idx) => {
-                  const isAi = para.classification === 'ai';
-                  const isMixed = para.classification === 'mixed';
-                  const isHuman = para.classification === 'human';
-                  const prob = para.aiProbability * 100;
-                  const hasRealText = para.text && !para.text.startsWith('[Section');
-
-                  if (!hasRealText) {
-                    return (
-                      <div
-                        key={para.id}
-                        className="border-l-2 border-slate-700 py-2 pl-4 text-xs italic text-slate-600"
-                      >
-                        [Section {idx + 1} — text not available for pre-existing articles]
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div
-                      key={para.id}
-                      className={`group relative border-l-2 py-2 pl-4 transition-colors ${
-                        isAi
-                          ? 'border-red-500/60 bg-red-500/[0.07] hover:bg-red-500/[0.12]'
-                          : isMixed
-                          ? 'border-yellow-500/50 bg-yellow-500/[0.05] hover:bg-yellow-500/[0.10]'
-                          : 'border-green-500/20 bg-transparent hover:bg-green-500/[0.04]'
-                      }`}
-                    >
-                      {/* Inline classification badge — appears on hover or always for AI/mixed */}
-                      <div className={`mb-1 flex items-center gap-2 text-xs ${
-                        isHuman ? 'opacity-0 group-hover:opacity-100 transition-opacity' : ''
-                      }`}>
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${
-                            isAi
-                              ? 'bg-red-500/20 text-red-400'
-                              : isMixed
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-green-500/15 text-green-500'
-                          }`}
-                        >
-                          {isAi ? (
-                            <Bot className="h-3 w-3" />
-                          ) : isMixed ? (
-                            <AlertTriangle className="h-3 w-3" />
-                          ) : (
-                            <User className="h-3 w-3" />
-                          )}
-                          {isAi ? 'AI' : isMixed ? 'Mixed' : 'Human'}
-                          <span className="ml-0.5 opacity-70">{prob.toFixed(0)}%</span>
-                        </span>
-                      </div>
-                      <p className={`text-sm leading-relaxed ${
-                        isAi ? 'text-slate-200' : isMixed ? 'text-slate-200' : 'text-slate-300'
-                      }`}>
-                        {para.text}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
+              <HighlightedArticle
+                paragraphs={aiParas.map(p => ({
+                  id: p.id,
+                  classification: p.classification,
+                  aiProbability: p.aiProbability,
+                  text: p.text,
+                  paragraphIndex: p.paragraphIndex,
+                }))}
+                explainPhrases={explainPhrases}
+              />
             </div>
           </div>
 
@@ -423,17 +393,17 @@ export default async function ArticleDetailPage({
                 Higher ratios indicate stronger AI signals.
               </p>
               <div className="space-y-3">
-                {(explainPatterns.statistics.proportion as number[])
-                  ?.map((ratio: number, i: number) => ({ ratio, index: i }))
-                  .sort((a: { ratio: number }, b: { ratio: number }) => b.ratio - a.ratio)
-                  .map(({ ratio, index: i }: { ratio: number; index: number }) => {
-                  const aiFreq = (explainPatterns.statistics.aiCount as number[])?.[i] ?? 0;
-                  const humanFreq = (explainPatterns.statistics.humanCount as number[])?.[i] ?? 0;
+                {[...explainPhrases]
+                  .sort((a, b) => b.ratio - a.ratio)
+                  .map((ep, i) => {
+                  const aiFreq = ep.aiFreq;
+                  const humanFreq = ep.humanFreq;
+                  const ratio = ep.ratio;
                   const total = aiFreq + humanFreq;
                   const aiPct = total > 0 ? (aiFreq / total) * 100 : 0;
                   const isHighRatio = ratio >= 10;
                   const isMedRatio = ratio >= 5;
-                  const phrase = explainPhrases[i] ?? `Pattern ${i + 1}`;
+                  const phrase = ep.phrase;
                   
                   return (
                     <div key={i} className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
