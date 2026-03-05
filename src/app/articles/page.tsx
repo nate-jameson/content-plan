@@ -13,6 +13,7 @@ const STATUS_TABS = [
   { label: 'Completed', value: 'COMPLETED' },
   { label: 'Flagged', value: 'FLAGGED' },
   { label: 'Approved', value: 'APPROVED' },
+  { label: 'Archived', value: 'ARCHIVED' },
 ] as const;
 
 const levelBadgeColors: Record<number, string> = {
@@ -28,7 +29,10 @@ export default async function ArticlesPage({
 }) {
   const { status } = await searchParams;
 
-  const where = status ? { status: status as any } : {};
+  // "All" tab excludes archived; specific tabs filter to that status
+  const where = status
+    ? { status: status as any }
+    : { status: { not: 'ARCHIVED' as any } };
 
   const articles = await prisma.article.findMany({
     where,
@@ -39,7 +43,6 @@ export default async function ArticlesPage({
         select: {
           aiScore: true,
           plagiarismScore: true,
-          grammarScore: true,
         },
       },
     },
@@ -86,7 +89,6 @@ export default async function ArticlesPage({
                 <th className="p-4 font-medium text-center">Status</th>
                 <th className="p-4 font-medium text-center">AI %</th>
                 <th className="p-4 font-medium text-center">Plagiarism %</th>
-                <th className="p-4 font-medium text-center">Grammar</th>
                 <th className="p-4 font-medium">Detected</th>
               </tr>
             </thead>
@@ -96,7 +98,9 @@ export default async function ArticlesPage({
                 return (
                   <tr
                     key={article.id}
-                    className="border-b border-slate-700/50 hover:bg-slate-700/20"
+                    className={`border-b border-slate-700/50 hover:bg-slate-700/20 ${
+                      article.status === 'ARCHIVED' ? 'opacity-60' : ''
+                    }`}
                   >
                     <td className="p-4">
                       <Link
@@ -132,11 +136,6 @@ export default async function ArticlesPage({
                         ? `${article.scanResult.plagiarismScore.toFixed(1)}%`
                         : '—'}
                     </td>
-                    <td className="p-4 text-center text-slate-300">
-                      {article.scanResult?.grammarScore != null
-                        ? article.scanResult.grammarScore.toFixed(0)
-                        : '—'}
-                    </td>
                     <td className="p-4 text-slate-500">
                       {formatDistanceToNow(new Date(article.detectedAt), {
                         addSuffix: true,
@@ -147,7 +146,7 @@ export default async function ArticlesPage({
               })}
               {articles.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                  <td colSpan={6} className="p-8 text-center text-slate-500">
                     <FileText className="mx-auto mb-2 h-8 w-8 text-slate-600" />
                     {status
                       ? `No articles with status "${status}"`
