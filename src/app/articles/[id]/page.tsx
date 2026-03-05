@@ -473,123 +473,24 @@ export default async function ArticleDetailPage({
               </div>
             </div>
 
-            {/* Paragraph-by-paragraph analysis */}
-            <div className="space-y-3">
-              {aiParas.map((para, idx) => {
-                const isAi = para.classification === 'ai';
-                const isMixed = para.classification === 'mixed';
-                const prob = para.aiProbability * 100;
-                const hasRealText = para.text && !para.text.startsWith('[Section');
-                
-                return (
-                  <div
-                    key={para.id}
-                    className={`rounded-lg border p-4 ${
-                      isAi
-                        ? 'border-red-400/25 bg-red-500/5'
-                        : isMixed
-                        ? 'border-yellow-400/25 bg-yellow-500/5'
-                        : 'border-green-400/25 bg-green-500/5'
-                    }`}
-                  >
-                    {/* Header row */}
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            isAi
-                              ? 'bg-red-500/20 text-red-300'
-                              : isMixed
-                              ? 'bg-yellow-500/20 text-yellow-300'
-                              : 'bg-green-500/20 text-green-300'
-                          }`}
-                        >
-                          {isAi ? (
-                            <Bot className="h-3 w-3" />
-                          ) : isMixed ? (
-                            <AlertTriangle className="h-3 w-3" />
-                          ) : (
-                            <User className="h-3 w-3" />
-                          )}
-                          {isAi ? 'AI Generated' : isMixed ? 'Mixed' : 'Human Written'}
-                        </span>
-                        <span className="text-xs text-slate-600">
-                          Section {idx + 1}
-                        </span>
-                      </div>
-                      
-                      {/* Confidence bar */}
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-700">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              isAi
-                                ? 'bg-red-500'
-                                : isMixed
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
-                            }`}
-                            style={{ width: `${isAi || isMixed ? prob : 100 - prob}%` }}
-                          />
-                        </div>
-                        <span
-                          className={`text-xs font-medium tabular-nums ${
-                            isAi ? 'text-red-300' : isMixed ? 'text-yellow-300' : 'text-green-300'
-                          }`}
-                        >
-                          {prob.toFixed(0)}% AI
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Text content */}
-                    {hasRealText ? (
-                      <p className={`text-sm leading-relaxed ${
-                        isAi ? 'text-red-200/80' : isMixed ? 'text-yellow-200/80' : 'text-green-200/80'
-                      }`}>
-                        {para.text.length > 800
-                          ? para.text.substring(0, 800) + '…'
-                          : para.text}
-                      </p>
-                    ) : (
-                      <p className="text-xs italic text-slate-600">
-                        Text preview not available — content will appear for newly scanned articles
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ── Full Article with Inline Highlighting ── */}
-          {cleanContent && paragraphRanges.length > 0 && (
-            <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-200">
-                <BookOpen className="h-5 w-5 text-teal-500" />
-                Full Article — AI Highlighting
-              </h2>
-              <p className="mb-4 text-xs text-slate-500">
-                Paragraphs color-coded by classification. Dotted underlines mark specific AI-flagged phrases — hover for details.
-              </p>
-              <div className="mb-3 flex flex-wrap gap-4 text-xs text-slate-500">
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-3 w-1 rounded-sm bg-red-500/40" /> AI-generated
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-3 w-1 rounded-sm bg-yellow-500/40" /> Mixed
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-3 w-1 rounded-sm bg-green-500/20" /> Human
-                </span>
+            {/* Full Article with Inline Highlighting */}
+            {cleanContent && paragraphRanges.length > 0 ? (
+              <div className="mt-2">
+                <p className="mb-4 text-xs text-slate-500">
+                  Paragraphs color-coded by classification. Dotted underlines mark specific AI-flagged phrases — hover for details.
+                </p>
+                <HighlightedArticle
+                  content={cleanContent}
+                  paragraphRanges={paragraphRanges}
+                  phraseHighlights={phraseHighlights}
+                />
               </div>
-              <HighlightedArticle
-                content={cleanContent}
-                paragraphRanges={paragraphRanges}
-                phraseHighlights={phraseHighlights}
-              />
-            </div>
-          )}
+            ) : (
+              <p className="mt-4 text-xs italic text-slate-600">
+                Full article highlighting not available — content will appear for newly scanned articles
+              </p>
+            )}
+          </div>
 
           {/* AI Pattern Analysis (if explain data available) */}
           {explainPatterns?.statistics && (
