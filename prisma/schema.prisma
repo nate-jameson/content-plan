@@ -164,6 +164,116 @@ model AiParagraph {
 }
 
 // ============================================================
+// PRACTICE BRAND GUIDES
+// ============================================================
+model Practice {
+  id              String   @id @default(cuid())
+  name            String   @unique                    // "Ada Smile Place"
+  titlePrefix     String   @unique @map("title_prefix") // "Ada Smile Place" - matched against article title
+  website         String?
+  brandVoiceNotes String?  @db.Text @map("brand_voice_notes") // Free-text brand voice guidelines
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  doctors       PracticeDoctor[]
+  services      PracticeService[]
+  bannedPhrases BannedPhrase[]
+  styleRules    StyleRule[]
+  editorialIssues EditorialIssue[]
+
+  @@map("practices")
+}
+
+model PracticeDoctor {
+  id              String   @id @default(cuid())
+  practiceId      String   @map("practice_id")
+  practice        Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  fullName        String   @map("full_name")          // "Dr. Jane Smith, DDS"
+  preferredFormat String   @map("preferred_format")    // How name should appear in content
+  role            String?                               // "Lead Dentist", "Orthodontist", etc.
+  isActive        Boolean  @default(true) @map("is_active")
+
+  @@index([practiceId])
+  @@map("practice_doctors")
+}
+
+model PracticeService {
+  id          String   @id @default(cuid())
+  practiceId  String   @map("practice_id")
+  practice    Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  serviceName String   @map("service_name")            // "Invisalign", "Dental Implants"
+  isOffered   Boolean  @default(true) @map("is_offered") // true = they offer it, false = explicitly DON'T
+
+  @@index([practiceId])
+  @@map("practice_services")
+}
+
+model BannedPhrase {
+  id              String   @id @default(cuid())
+  practiceId      String   @map("practice_id")
+  practice        Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  phrase          String                                // "cheap", "discount", "pain"
+  suggestedAlt    String?  @map("suggested_alt")       // "affordable", "special offer", "discomfort"
+  reason          String?                               // Why it's banned
+  severity        String   @default("warning")          // "error" | "warning"
+
+  @@index([practiceId])
+  @@map("banned_phrases")
+}
+
+model StyleRule {
+  id          String   @id @default(cuid())
+  practiceId  String   @map("practice_id")
+  practice    Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  rule        String                                    // "Always capitalize 'Invisalign'"
+  category    String   @default("general")              // "capitalization", "terminology", "tone", "general"
+
+  @@index([practiceId])
+  @@map("style_rules")
+}
+
+// ============================================================
+// EDITORIAL ISSUES (Gemini-detected brand violations)
+// ============================================================
+model EditorialIssue {
+  id          String   @id @default(cuid())
+  articleId   String   @map("article_id")
+  practiceId  String   @map("practice_id")
+  practice    Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  type        String                                    // "name_violation", "banned_phrase", "service_mismatch", "style_violation", "brand_voice"
+  severity    String   @default("warning")              // "error" | "warning" | "info"
+  
+  // Location in article
+  originalText  String  @db.Text @map("original_text")  // The problematic text
+  charStart     Int?    @map("char_start")
+  charEnd       Int?    @map("char_end")
+  
+  // Suggestion
+  suggestedFix  String? @db.Text @map("suggested_fix")  // What it should say
+  explanation   String? @db.Text                         // Why this is an issue
+  
+  // Editor action
+  editorAction  String?  @map("editor_action")          // "accepted" | "rejected" | "edited"
+  editorNote    String?  @db.Text @map("editor_note")
+  resolvedAt    DateTime? @map("resolved_at")
+  
+  // Google Doc sync
+  pushedToDoc   Boolean  @default(false) @map("pushed_to_doc")
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([articleId])
+  @@index([practiceId])
+  @@map("editorial_issues")
+}
+
+// ============================================================
 // SYSTEM CONFIG / SYNC STATE
 // ============================================================
 model SyncState {
