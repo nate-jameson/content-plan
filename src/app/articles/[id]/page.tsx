@@ -68,39 +68,55 @@ export default async function ArticleDetailPage({
   const explainPatterns = rawResponse?.explain?.patterns;
   const articleContent = article.content ?? '';
 
-  // Extract actual flagged phrases using word positions (more reliable than char positions)
-  // Copyleaks provides words.starts (word index) and words.lengths (word count) which avoid
-  // offset issues from BOM characters, \r line endings, etc.
-  const explainPhrases: { phrase: string; ratio: number; aiFreq: number; humanFreq: number }[] = [];
-  const contentWords = articleContent ? articleContent.split(/\s+/).filter(w => w.length > 0) : [];
-  
+  // Clean content: strip BOM and normalize line endings to match Copyleaks tokenization
+  const cleanContent = articleContent.replace(/\ufeff/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Extract phrases using word positions with exact character mapping
+  // Word positions avoid BOM/encoding offset issues. We also compute exact char ranges
+  // in the clean content so the component can highlight by position (no indexOf needed).
+  const explainPhrases: { phrase: string; ratio: number; aiFreq: number; humanFreq: number; charStart: number; charEnd: number }[] = [];
+  const contentWords = cleanContent ? cleanContent.split(/\s+/).filter(w => w.length > 0) : [];
+
+  // Build word-to-character position map for exact highlighting
+  const wordCharPositions: { start: number; end: number }[] = [];
+  if (contentWords.length > 0) {
+    let searchFrom = 0;
+    for (const word of contentWords) {
+      const idx = cleanContent.indexOf(word, searchFrom);
+      wordCharPositions.push({ start: idx, end: idx + word.length });
+      searchFrom = idx + word.length;
+    }
+  }
+
   if (explainPatterns?.text?.words?.starts && contentWords.length > 0) {
     const wordStarts = explainPatterns.text.words.starts as number[];
     const wordLengths = explainPatterns.text.words.lengths as number[];
-    const proportions = (explainPatterns.statistics?.proportion as number[]) ?? [];
     const aiCounts = (explainPatterns.statistics?.aiCount as number[]) ?? [];
     const humanCounts = (explainPatterns.statistics?.humanCount as number[]) ?? [];
 
     for (let i = 0; i < wordStarts.length; i++) {
       const ws = wordStarts[i];
       const wl = wordLengths[i] ?? 1;
-      const phraseWords = contentWords.slice(ws, ws + wl);
-      const phrase = phraseWords.join(' ');
+      const endWordIdx = Math.min(ws + wl - 1, contentWords.length - 1);
+
+      if (ws >= contentWords.length) continue;
+
+      const charStart = wordCharPositions[ws]?.start ?? 0;
+      const charEnd = wordCharPositions[endWordIdx]?.end ?? charStart;
+      const phrase = cleanContent.substring(charStart, charEnd);
+
+      const aiFreq = aiCounts[i] ?? 0;
+      const humanFreq = humanCounts[i] ?? 0;
+      const ratio = humanFreq > 0 ? aiFreq / humanFreq : (aiFreq > 0 ? 999 : 0);
 
       if (phrase.length > 0) {
-        explainPhrases.push({
-          phrase,
-          ratio: proportions[i] ?? 0,
-          aiFreq: aiCounts[i] ?? 0,
-          humanFreq: humanCounts[i] ?? 0,
-        });
+        explainPhrases.push({ phrase, ratio, aiFreq, humanFreq, charStart, charEnd });
       }
     }
-  } else if (explainPatterns?.text?.chars?.starts && articleContent) {
+  } else if (explainPatterns?.text?.chars?.starts && cleanContent) {
     // Fallback to character-based extraction with word-boundary snapping
     const starts = explainPatterns.text.chars.starts as number[];
     const lengths = explainPatterns.text.chars.lengths as number[];
-    const proportions = (explainPatterns.statistics?.proportion as number[]) ?? [];
     const aiCounts = (explainPatterns.statistics?.aiCount as number[]) ?? [];
     const humanCounts = (explainPatterns.statistics?.humanCount as number[]) ?? [];
 
@@ -108,16 +124,14 @@ export default async function ArticleDetailPage({
       let start = starts[i];
       const len = lengths[i] ?? 0;
       let end = start + len;
-      while (start > 0 && !/[\s\n\r]/.test(articleContent[start - 1])) start--;
-      while (end < articleContent.length && !/[\s\n\r.,;:!?)]/.test(articleContent[end])) end++;
-      const phrase = articleContent.substring(start, end).trim();
+      while (start > 0 && !/[\s\n\r]/.test(cleanContent[start - 1])) start--;
+      while (end < cleanContent.length && !/[\s\n\r.,;:!?)]/.test(cleanContent[end])) end++;
+      const phrase = cleanContent.substring(start, end).trim();
+      const aiFreq = aiCounts[i] ?? 0;
+      const humanFreq = humanCounts[i] ?? 0;
+      const ratio = humanFreq > 0 ? aiFreq / humanFreq : (aiFreq > 0 ? 999 : 0);
       if (phrase.length > 0) {
-        explainPhrases.push({
-          phrase,
-          ratio: proportions[i] ?? 0,
-          aiFreq: aiCounts[i] ?? 0,
-          humanFreq: humanCounts[i] ?? 0,
-        });
+        explainPhrases.push({ phrase, ratio, aiFreq, humanFreq, charStart: start, charEnd: end });
       }
     }
   }
@@ -396,6 +410,7 @@ export default async function ArticleDetailPage({
                   paragraphIndex: p.paragraphIndex,
                 }))}
                 explainPhrases={explainPhrases}
+                cleanContent={cleanContent}
               />
             </div>
           </div>
