@@ -329,35 +329,63 @@ export default async function ArticleDetailPage({
               </div>
             </div>
 
-            {/* Paragraph-by-paragraph analysis */}
-            <div className="space-y-3">
-              {aiParas.map((para, idx) => {
-                const isAi = para.classification === 'ai';
-                const isMixed = para.classification === 'mixed';
-                const prob = para.aiProbability * 100;
-                const hasRealText = para.text && !para.text.startsWith('[Section');
-                
-                return (
-                  <div
-                    key={para.id}
-                    className={`rounded-lg border p-4 ${
-                      isAi
-                        ? 'border-red-500/30 bg-red-500/5'
-                        : isMixed
-                        ? 'border-yellow-500/30 bg-yellow-500/5'
-                        : 'border-green-500/30 bg-green-500/5'
-                    }`}
-                  >
-                    {/* Header row */}
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+            {/* Full Article with Contextual Highlighting */}
+            <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-sm font-medium text-slate-400">Full Article — AI Detection Overlay</h3>
+                <div className="flex items-center gap-4 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/30 ring-1 ring-red-500/40" /> AI Generated
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm bg-yellow-500/20 ring-1 ring-yellow-500/30" /> Mixed
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-500/10 ring-1 ring-green-500/20" /> Human
+                  </span>
+                </div>
+              </div>
+              <div className="prose prose-sm prose-invert max-w-none space-y-0">
+                {aiParas.map((para, idx) => {
+                  const isAi = para.classification === 'ai';
+                  const isMixed = para.classification === 'mixed';
+                  const isHuman = para.classification === 'human';
+                  const prob = para.aiProbability * 100;
+                  const hasRealText = para.text && !para.text.startsWith('[Section');
+
+                  if (!hasRealText) {
+                    return (
+                      <div
+                        key={para.id}
+                        className="border-l-2 border-slate-700 py-2 pl-4 text-xs italic text-slate-600"
+                      >
+                        [Section {idx + 1} — text not available for pre-existing articles]
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={para.id}
+                      className={`group relative border-l-2 py-2 pl-4 transition-colors ${
+                        isAi
+                          ? 'border-red-500/60 bg-red-500/[0.07] hover:bg-red-500/[0.12]'
+                          : isMixed
+                          ? 'border-yellow-500/50 bg-yellow-500/[0.05] hover:bg-yellow-500/[0.10]'
+                          : 'border-green-500/20 bg-transparent hover:bg-green-500/[0.04]'
+                      }`}
+                    >
+                      {/* Inline classification badge — appears on hover or always for AI/mixed */}
+                      <div className={`mb-1 flex items-center gap-2 text-xs ${
+                        isHuman ? 'opacity-0 group-hover:opacity-100 transition-opacity' : ''
+                      }`}>
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${
                             isAi
                               ? 'bg-red-500/20 text-red-400'
                               : isMixed
                               ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-green-500/20 text-green-400'
+                              : 'bg-green-500/15 text-green-500'
                           }`}
                         >
                           {isAi ? (
@@ -367,54 +395,19 @@ export default async function ArticleDetailPage({
                           ) : (
                             <User className="h-3 w-3" />
                           )}
-                          {isAi ? 'AI Generated' : isMixed ? 'Mixed' : 'Human Written'}
-                        </span>
-                        <span className="text-xs text-slate-600">
-                          Section {idx + 1}
+                          {isAi ? 'AI' : isMixed ? 'Mixed' : 'Human'}
+                          <span className="ml-0.5 opacity-70">{prob.toFixed(0)}%</span>
                         </span>
                       </div>
-                      
-                      {/* Confidence bar */}
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-700">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              isAi
-                                ? 'bg-red-500'
-                                : isMixed
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
-                            }`}
-                            style={{ width: `${isAi || isMixed ? prob : 100 - prob}%` }}
-                          />
-                        </div>
-                        <span
-                          className={`text-xs font-medium tabular-nums ${
-                            isAi ? 'text-red-400' : isMixed ? 'text-yellow-400' : 'text-green-400'
-                          }`}
-                        >
-                          {prob.toFixed(0)}% AI
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Text content */}
-                    {hasRealText ? (
                       <p className={`text-sm leading-relaxed ${
-                        isAi ? 'text-red-200/80' : isMixed ? 'text-yellow-200/80' : 'text-green-200/80'
+                        isAi ? 'text-slate-200' : isMixed ? 'text-slate-200' : 'text-slate-300'
                       }`}>
-                        {para.text.length > 800
-                          ? para.text.substring(0, 800) + '…'
-                          : para.text}
+                        {para.text}
                       </p>
-                    ) : (
-                      <p className="text-xs italic text-slate-600">
-                        Text preview not available — content will appear for newly scanned articles
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
