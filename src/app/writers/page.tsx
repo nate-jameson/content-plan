@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { AddWriterForm } from './add-writer-form';
 import { WriterToggle } from './writer-toggle';
+import { WriterActions } from './writer-actions';
 import { ExternalLink, FolderOpen, Users } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,7 @@ export default async function WritersPage() {
                 <th className="p-4 font-medium text-center">Avg AI %</th>
                 <th className="p-4 font-medium text-center">Avg Plag %</th>
                 <th className="p-4 font-medium text-center">Active</th>
+                <th className="p-4 font-medium text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -105,11 +107,14 @@ export default async function WritersPage() {
                   <td className="p-4 text-center">
                     <WriterToggle writerId={writer.id} isActive={writer.isActive} />
                   </td>
+                  <td className="p-4 text-center">
+                    <WriterActions writer={{ id: writer.id, name: writer.name, email: writer.email, driveFolderId: writer.driveFolderId }} />
+                  </td>
                 </tr>
               ))}
               {writers.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                  <td colSpan={8} className="p-8 text-center text-slate-500">
                     <Users className="mx-auto mb-2 h-8 w-8 text-slate-600" />
                     No writers added yet. Use the form above to add one.
                   </td>
