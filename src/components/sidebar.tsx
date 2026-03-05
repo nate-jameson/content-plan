@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
+  Building2,
   Settings,
   ShieldCheck,
   LogOut,
@@ -17,6 +18,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/writers', label: 'Writers', icon: Users },
   { href: '/articles', label: 'Articles', icon: FileText },
+  { href: '/practices', label: 'Practices', icon: Building2 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
