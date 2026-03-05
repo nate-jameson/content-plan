@@ -15,6 +15,12 @@ const STATUS_TABS = [
   { label: 'Approved', value: 'APPROVED' },
 ] as const;
 
+const levelBadgeColors: Record<number, string> = {
+  1: 'bg-slate-600/30 text-slate-400',
+  2: 'bg-blue-500/20 text-blue-400',
+  3: 'bg-amber-500/20 text-amber-400',
+};
+
 export default async function ArticlesPage({
   searchParams,
 }: {
@@ -80,54 +86,68 @@ export default async function ArticlesPage({
                 <th className="p-4 font-medium text-center">Status</th>
                 <th className="p-4 font-medium text-center">AI %</th>
                 <th className="p-4 font-medium text-center">Plagiarism %</th>
+                <th className="p-4 font-medium text-center">Grammar</th>
                 <th className="p-4 font-medium">Detected</th>
               </tr>
             </thead>
             <tbody>
-              {articles.map((article) => (
-                <tr
-                  key={article.id}
-                  className="border-b border-slate-700/50 hover:bg-slate-700/20"
-                >
-                  <td className="p-4">
-                    <Link
-                      href={`/articles/${article.id}`}
-                      className="font-medium text-slate-200 hover:text-teal-400"
-                    >
-                      {article.title}
-                    </Link>
-                  </td>
-                  <td className="p-4">
-                    <Link
-                      href={`/writers/${article.writer.id}`}
-                      className="text-slate-400 hover:text-teal-400"
-                    >
-                      {article.writer.name}
-                    </Link>
-                  </td>
-                  <td className="p-4 text-center">
-                    <StatusBadge status={article.status} />
-                  </td>
-                  <td className="p-4 text-center text-slate-300">
-                    {article.scanResult
-                      ? `${(article.scanResult.aiScore * 100).toFixed(0)}%`
-                      : '—'}
-                  </td>
-                  <td className="p-4 text-center text-slate-300">
-                    {article.scanResult
-                      ? `${article.scanResult.plagiarismScore.toFixed(1)}%`
-                      : '—'}
-                  </td>
-                  <td className="p-4 text-slate-500">
-                    {formatDistanceToNow(new Date(article.detectedAt), {
-                      addSuffix: true,
-                    })}
-                  </td>
-                </tr>
-              ))}
+              {articles.map((article) => {
+                const level = article.aiDetectionLevel ?? 2;
+                return (
+                  <tr
+                    key={article.id}
+                    className="border-b border-slate-700/50 hover:bg-slate-700/20"
+                  >
+                    <td className="p-4">
+                      <Link
+                        href={`/articles/${article.id}`}
+                        className="font-medium text-slate-200 hover:text-teal-400"
+                      >
+                        {article.title}
+                      </Link>
+                    </td>
+                    <td className="p-4">
+                      <Link
+                        href={`/writers/${article.writer.id}`}
+                        className="text-slate-400 hover:text-teal-400"
+                      >
+                        {article.writer.name}
+                      </Link>
+                    </td>
+                    <td className="p-4 text-center">
+                      <StatusBadge status={article.status} />
+                    </td>
+                    <td className="p-4 text-center text-slate-300">
+                      {article.scanResult ? (
+                        <span className="inline-flex items-center gap-1">
+                          {(article.scanResult.aiScore * 100).toFixed(0)}%
+                          <span className={`inline-flex rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${levelBadgeColors[level] ?? levelBadgeColors[2]}`}>
+                            L{level}
+                          </span>
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="p-4 text-center text-slate-300">
+                      {article.scanResult
+                        ? `${article.scanResult.plagiarismScore.toFixed(1)}%`
+                        : '—'}
+                    </td>
+                    <td className="p-4 text-center text-slate-300">
+                      {article.scanResult?.grammarScore != null
+                        ? article.scanResult.grammarScore.toFixed(0)
+                        : '—'}
+                    </td>
+                    <td className="p-4 text-slate-500">
+                      {formatDistanceToNow(new Date(article.detectedAt), {
+                        addSuffix: true,
+                      })}
+                    </td>
+                  </tr>
+                );
+              })}
               {articles.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">
+                  <td colSpan={7} className="p-8 text-center text-slate-500">
                     <FileText className="mx-auto mb-2 h-8 w-8 text-slate-600" />
                     {status
                       ? `No articles with status "${status}"`

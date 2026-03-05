@@ -57,6 +57,7 @@ model Article {
   
   // Copyleaks tracking
   copyleaksScanId String?     @unique @map("copyleaks_scan_id")
+  aiDetectionLevel  Int       @default(2) @map("ai_detection_level")
   
   // Content snapshot (for AI text extraction & Copyleaks submission)
   content       String?       @db.Text              // Full text submitted to Copyleaks

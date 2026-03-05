@@ -63,6 +63,7 @@ export async function submitScan(params: {
   articleId: string;      // Passed back in webhook as developerPayload
   webhookUrl: string;     // Where Copyleaks sends results
   sandbox?: boolean;      // Use sandbox mode for testing
+  sensitivityLevel?: number; // 1-3, defaults to 2
 }): Promise<void> {
   const token = await getAccessToken();
 
@@ -89,9 +90,6 @@ export async function submitScan(params: {
           },
           aiGeneratedText: {
             detect: true,
-            explain: {
-              enable: true,
-            },
           },
           // writingFeedback not available on current plan
           scanning: {
@@ -102,7 +100,7 @@ export async function submitScan(params: {
               includeOthersSubmissions: true,
             },
           },
-          sensitivityLevel: 3,
+          sensitivityLevel: params.sensitivityLevel ?? 2,
         },
       }),
     }

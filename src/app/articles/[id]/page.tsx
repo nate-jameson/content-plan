@@ -4,7 +4,6 @@ import { prisma } from '@/lib/db';
 import { StatusBadge } from '@/components/status-badge';
 import { ScoreGauge } from '@/components/score-gauge';
 import { ArticleActions } from './article-actions';
-import { HighlightedArticle } from './highlighted-article';
 import { format } from 'date-fns';
 import {
   ArrowLeft,
@@ -19,6 +18,9 @@ import {
   Bot,
   User,
   BarChart3,
+  BookOpen,
+  Clock,
+  Info,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -47,10 +49,31 @@ export default async function ArticleDetailPage({
     notFound();
   }
 
+  // Fetch team averages for completed articles
+  const teamAverages = await prisma.scanResult.aggregate({
+    where: {
+      article: {
+        status: { in: ['COMPLETED', 'REVIEWED', 'APPROVED', 'FLAGGED'] },
+      },
+    },
+    _avg: {
+      aiScore: true,
+      plagiarismScore: true,
+    },
+  });
+
+  const avgAiScore = (teamAverages._avg.aiScore ?? 0) * 100;
+  const avgPlagiarismScore = teamAverages._avg.plagiarismScore ?? 0;
+
   const scan = article.scanResult;
   const aiPending = scan && scan.aiScore < 0; // -1 means export pending
   const aiScore = aiPending ? 0 : (scan?.aiScore ?? 0);
   const humanScore = aiPending ? 0 : (scan?.humanScore ?? 0);
+  const detectionLevel = article.aiDetectionLevel ?? 2;
+
+  // Reading stats
+  const wordCount = article.wordCount ?? 0;
+  const readingTime = Math.max(1, Math.round(wordCount / 238));
 
   // Separate internet vs database sources
   const internetSources = scan?.sources.filter((s) => s.isInternetSource) ?? [];
@@ -68,71 +91,16 @@ export default async function ArticleDetailPage({
   const explainPatterns = rawResponse?.explain?.patterns;
   const articleContent = article.content ?? '';
 
-  // Clean content: strip BOM and normalize line endings to match Copyleaks tokenization
-  const cleanContent = articleContent.replace(/\ufeff/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-  // Extract phrases using word positions with exact character mapping
-  // Word positions avoid BOM/encoding offset issues. We also compute exact char ranges
-  // in the clean content so the component can highlight by position (no indexOf needed).
-  const explainPhrases: { phrase: string; ratio: number; aiFreq: number; humanFreq: number; charStart: number; charEnd: number }[] = [];
-  const contentWords = cleanContent ? cleanContent.split(/\s+/).filter(w => w.length > 0) : [];
-
-  // Build word-to-character position map for exact highlighting
-  const wordCharPositions: { start: number; end: number }[] = [];
-  if (contentWords.length > 0) {
-    let searchFrom = 0;
-    for (const word of contentWords) {
-      const idx = cleanContent.indexOf(word, searchFrom);
-      wordCharPositions.push({ start: idx, end: idx + word.length });
-      searchFrom = idx + word.length;
-    }
-  }
-
-  if (explainPatterns?.text?.words?.starts && contentWords.length > 0) {
-    const wordStarts = explainPatterns.text.words.starts as number[];
-    const wordLengths = explainPatterns.text.words.lengths as number[];
-    const aiCounts = (explainPatterns.statistics?.aiCount as number[]) ?? [];
-    const humanCounts = (explainPatterns.statistics?.humanCount as number[]) ?? [];
-
-    for (let i = 0; i < wordStarts.length; i++) {
-      const ws = wordStarts[i];
-      const wl = wordLengths[i] ?? 1;
-      const endWordIdx = Math.min(ws + wl - 1, contentWords.length - 1);
-
-      if (ws >= contentWords.length) continue;
-
-      const charStart = wordCharPositions[ws]?.start ?? 0;
-      const charEnd = wordCharPositions[endWordIdx]?.end ?? charStart;
-      const phrase = cleanContent.substring(charStart, charEnd);
-
-      const aiFreq = aiCounts[i] ?? 0;
-      const humanFreq = humanCounts[i] ?? 0;
-      const ratio = humanFreq > 0 ? aiFreq / humanFreq : (aiFreq > 0 ? 999 : 0);
-
-      if (phrase.length > 0) {
-        explainPhrases.push({ phrase, ratio, aiFreq, humanFreq, charStart, charEnd });
-      }
-    }
-  } else if (explainPatterns?.text?.chars?.starts && cleanContent) {
-    // Fallback to character-based extraction with word-boundary snapping
+  // Extract actual flagged phrases from character positions
+  const explainPhrases: string[] = [];
+  if (explainPatterns?.text?.chars?.starts && articleContent) {
     const starts = explainPatterns.text.chars.starts as number[];
     const lengths = explainPatterns.text.chars.lengths as number[];
-    const aiCounts = (explainPatterns.statistics?.aiCount as number[]) ?? [];
-    const humanCounts = (explainPatterns.statistics?.humanCount as number[]) ?? [];
-
     for (let i = 0; i < starts.length; i++) {
-      let start = starts[i];
+      const start = starts[i];
       const len = lengths[i] ?? 0;
-      let end = start + len;
-      while (start > 0 && !/[\s\n\r]/.test(cleanContent[start - 1])) start--;
-      while (end < cleanContent.length && !/[\s\n\r.,;:!?)]/.test(cleanContent[end])) end++;
-      const phrase = cleanContent.substring(start, end).trim();
-      const aiFreq = aiCounts[i] ?? 0;
-      const humanFreq = humanCounts[i] ?? 0;
-      const ratio = humanFreq > 0 ? aiFreq / humanFreq : (aiFreq > 0 ? 999 : 0);
-      if (phrase.length > 0) {
-        explainPhrases.push({ phrase, ratio, aiFreq, humanFreq, charStart: start, charEnd: end });
-      }
+      const phrase = articleContent.substring(start, start + len).trim();
+      explainPhrases.push(phrase || `[Position ${start}]`);
     }
   }
 
@@ -167,6 +135,17 @@ export default async function ArticleDetailPage({
     },
   };
   const risk = riskConfig[riskLevel];
+
+  // Compute "vs average" badges
+  const aiDiff = scan && !aiPending ? aiPercent - avgAiScore : null;
+  const plagDiff = scan ? (scan.plagiarismScore - avgPlagiarismScore) : null;
+
+  // Detection level badge colors
+  const levelColors: Record<number, string> = {
+    1: 'bg-slate-600/30 text-slate-400',
+    2: 'bg-blue-500/20 text-blue-400',
+    3: 'bg-amber-500/20 text-amber-400',
+  };
 
   return (
     <div className="space-y-8">
@@ -216,7 +195,11 @@ export default async function ArticleDetailPage({
           </div>
 
           {/* Action Buttons */}
-          <ArticleActions articleId={article.id} currentStatus={article.status} />
+          <ArticleActions
+            articleId={article.id}
+            currentStatus={article.status}
+            aiDetectionLevel={detectionLevel}
+          />
         </div>
       </div>
 
@@ -246,42 +229,63 @@ export default async function ArticleDetailPage({
                   size="lg"
                 />
                 <div>
-                  <p className="text-sm font-medium text-slate-300">AI Detection</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-slate-300">AI Detection</p>
+                    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${levelColors[detectionLevel] ?? levelColors[2]}`}>
+                      Level {detectionLevel}
+                    </span>
+                  </div>
                   <p className="mt-1 text-xs text-slate-500">
                     {(aiScore * 100).toFixed(1)}% AI · {(humanScore * 100).toFixed(1)}% Human
                   </p>
+                  {aiDiff !== null && (
+                    <p className={`mt-0.5 text-[10px] font-medium ${
+                      aiDiff > 0 ? 'text-red-400' : 'text-green-400'
+                    }`}>
+                      {aiDiff > 0 ? '↑' : '↓'} {Math.abs(aiDiff).toFixed(1)}% {aiDiff > 0 ? 'above' : 'below'} avg
+                    </p>
+                  )}
                 </div>
               </>
             )}
           </div>
 
-          {/* Plagiarism */}
+          {/* Plagiarism / Originality */}
           <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
             <ScoreGauge
-              score={scan.plagiarismScore}
-              label="Plagiarism"
-              invertColors
+              score={100 - scan.plagiarismScore}
+              label="Originality"
               size="lg"
             />
             <div>
-              <p className="text-sm font-medium text-slate-300">Plagiarism Detected</p>
+              <p className="text-sm font-medium text-slate-300">Plagiarism</p>
               <p className="mt-1 text-xs text-slate-500">
                 {scan.plagiarismScore.toFixed(1)}% matched ·{' '}
                 {scan.matchedWords}/{scan.totalWords} words
               </p>
+              {plagDiff !== null && (
+                <p className={`mt-0.5 text-[10px] font-medium ${
+                  plagDiff > 0 ? 'text-red-400' : 'text-green-400'
+                }`}>
+                  {plagDiff > 0 ? '↑' : '↓'} {Math.abs(plagDiff).toFixed(1)}% {plagDiff > 0 ? 'above' : 'below'} avg
+                </p>
+              )}
             </div>
           </div>
 
           {/* Reading Stats */}
           <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-slate-600 bg-slate-700/50">
+              <BookOpen className="h-6 w-6 text-teal-400" />
+            </div>
             <div>
               <p className="text-sm font-medium text-slate-300">Reading Stats</p>
               <p className="mt-1 text-xs text-slate-500">
-                {scan.readabilityGrade
-                  ? `${scan.readabilityGrade} level`
-                  : 'No readability data'}
-                {scan.readingTimeMinutes != null &&
-                  ` · ${scan.readingTimeMinutes.toFixed(0)} min read`}
+                {wordCount.toLocaleString()} words
+              </p>
+              <p className="flex items-center gap-1 text-xs text-slate-500">
+                <Clock className="h-3 w-3" />
+                ~{readingTime} min read
               </p>
             </div>
           </div>
@@ -318,10 +322,36 @@ export default async function ArticleDetailPage({
           {/* AI Detection Breakdown */}
           <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-100">
-                <BarChart3 className="h-5 w-5 text-teal-500" />
-                AI Detection Breakdown
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-100">
+                  <BarChart3 className="h-5 w-5 text-teal-500" />
+                  AI Detection Breakdown
+                </h2>
+                {/* Detection Level Info Tooltip */}
+                <div className="group relative">
+                  <Info className="h-4 w-4 cursor-help text-slate-500 hover:text-slate-300" />
+                  <div className="invisible absolute left-0 top-6 z-50 w-80 rounded-lg border border-slate-600 bg-slate-800 p-4 shadow-xl group-hover:visible">
+                    <p className="mb-2 text-xs font-semibold text-slate-200">AI Detection Sensitivity Levels:</p>
+                    <div className="space-y-2 text-xs text-slate-400">
+                      <div>
+                        <span className="font-semibold text-slate-300">Level 1 — Basic:</span>{' '}
+                        Only catches content copied straight from ChatGPT, Gemini, or other AI tools with zero edits
+                      </div>
+                      <div>
+                        <span className="font-semibold text-blue-400">Level 2 — Standard (Default):</span>{' '}
+                        Catches AI-generated content with minor tweaks — tense changes, added words, light editing
+                      </div>
+                      <div>
+                        <span className="font-semibold text-amber-400">Level 3 — Strict:</span>{' '}
+                        Catches heavily modified AI content — paraphrased, tool-rewritten, or substantially edited AI text
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${levelColors[detectionLevel] ?? levelColors[2]}`}>
+                  Level {detectionLevel}
+                </span>
+              </div>
               <span className="text-sm text-slate-500">
                 {totalParas} section{totalParas !== 1 ? 's' : ''} analyzed
               </span>
@@ -381,83 +411,92 @@ export default async function ArticleDetailPage({
               </div>
             </div>
 
-            {/* Full Article with Contextual Highlighting */}
-            <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-medium text-slate-400">Full Article — AI Detection Overlay</h3>
-                <div className="flex items-center gap-4 text-xs text-slate-500">
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/30 ring-1 ring-red-500/40" /> AI Generated
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-2.5 w-2.5 rounded-sm bg-yellow-500/20 ring-1 ring-yellow-500/30" /> Mixed
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-500/10 ring-1 ring-green-500/20" /> Human
-                  </span>
-                </div>
-              </div>
-              <HighlightedArticle
-                paragraphs={(() => {
-                  // Pre-compute paragraph ranges and local phrases SERVER-SIDE
-                  // to avoid fragile indexOf matching on the client
-                  const mapped = aiParas.map(p => {
-                    // Strip BOM from para text before matching (DB text may have BOM)
-                    const cleanParaText = p.text
-                      ? p.text.replace(/\ufeff/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
-                      : '';
-                    return {
-                      id: p.id,
-                      classification: p.classification,
-                      aiProbability: p.aiProbability,
-                      text: cleanParaText || p.text,
-                      paragraphIndex: p.paragraphIndex,
-                      localPhrases: [] as { localStart: number; localEnd: number; phrase: string; ratio: number; aiFreq: number; humanFreq: number }[],
-                    };
-                  });
+            {/* Paragraph-by-paragraph analysis */}
+            <div className="space-y-3">
+              {aiParas.map((para, idx) => {
+                const isAi = para.classification === 'ai';
+                const isMixed = para.classification === 'mixed';
+                const prob = para.aiProbability * 100;
+                const hasRealText = para.text && !para.text.startsWith('[Section');
+                
+                return (
+                  <div
+                    key={para.id}
+                    className={`rounded-lg border p-4 ${
+                      isAi
+                        ? 'border-red-500/30 bg-red-500/5'
+                        : isMixed
+                        ? 'border-yellow-500/30 bg-yellow-500/5'
+                        : 'border-green-500/30 bg-green-500/5'
+                    }`}
+                  >
+                    {/* Header row */}
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            isAi
+                              ? 'bg-red-500/20 text-red-400'
+                              : isMixed
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-green-500/20 text-green-400'
+                          }`}
+                        >
+                          {isAi ? (
+                            <Bot className="h-3 w-3" />
+                          ) : isMixed ? (
+                            <AlertTriangle className="h-3 w-3" />
+                          ) : (
+                            <User className="h-3 w-3" />
+                          )}
+                          {isAi ? 'AI Generated' : isMixed ? 'Mixed' : 'Human Written'}
+                        </span>
+                        <span className="text-xs text-slate-600">
+                          Section {idx + 1}
+                        </span>
+                      </div>
+                      
+                      {/* Confidence bar */}
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-700">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              isAi
+                                ? 'bg-red-500'
+                                : isMixed
+                                ? 'bg-yellow-500'
+                                : 'bg-green-500'
+                            }`}
+                            style={{ width: `${isAi || isMixed ? prob : 100 - prob}%` }}
+                          />
+                        </div>
+                        <span
+                          className={`text-xs font-medium tabular-nums ${
+                            isAi ? 'text-red-400' : isMixed ? 'text-yellow-400' : 'text-green-400'
+                          }`}
+                        >
+                          {prob.toFixed(0)}% AI
+                        </span>
+                      </div>
+                    </div>
 
-                  // Find each paragraph's position in cleanContent
-                  let searchFrom = 0;
-                  const paraRanges: { start: number; end: number }[] = [];
-                  for (const mp of mapped) {
-                    const t = mp.text?.trim() || '';
-                    if (!t) {
-                      paraRanges.push({ start: -1, end: -1 });
-                      continue;
-                    }
-                    let idx = cleanContent.indexOf(t, searchFrom);
-                    if (idx === -1 && t.length > 50) {
-                      idx = cleanContent.indexOf(t.substring(0, 50), searchFrom);
-                    }
-                    if (idx >= 0) {
-                      paraRanges.push({ start: idx, end: idx + t.length });
-                      searchFrom = idx + t.length;
-                    } else {
-                      paraRanges.push({ start: -1, end: -1 });
-                    }
-                  }
-
-                  // Map phrases to paragraphs with local offsets
-                  for (let i = 0; i < mapped.length; i++) {
-                    const range = paraRanges[i];
-                    if (range.start < 0) continue;
-                    for (const ep of explainPhrases) {
-                      if (ep.charStart >= range.start && ep.charEnd <= range.end) {
-                        mapped[i].localPhrases.push({
-                          localStart: ep.charStart - range.start,
-                          localEnd: ep.charEnd - range.start,
-                          phrase: ep.phrase,
-                          ratio: ep.ratio,
-                          aiFreq: ep.aiFreq,
-                          humanFreq: ep.humanFreq,
-                        });
-                      }
-                    }
-                  }
-
-                  return mapped;
-                })()}
-              />
+                    {/* Text content */}
+                    {hasRealText ? (
+                      <p className={`text-sm leading-relaxed ${
+                        isAi ? 'text-red-200/80' : isMixed ? 'text-yellow-200/80' : 'text-green-200/80'
+                      }`}>
+                        {para.text.length > 800
+                          ? para.text.substring(0, 800) + '…'
+                          : para.text}
+                      </p>
+                    ) : (
+                      <p className="text-xs italic text-slate-600">
+                        Text preview not available — content will appear for newly scanned articles
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -473,17 +512,17 @@ export default async function ArticleDetailPage({
                 Higher ratios indicate stronger AI signals.
               </p>
               <div className="space-y-3">
-                {[...explainPhrases]
-                  .sort((a, b) => b.ratio - a.ratio)
-                  .map((ep, i) => {
-                  const aiFreq = ep.aiFreq;
-                  const humanFreq = ep.humanFreq;
-                  const ratio = ep.ratio;
+                {(explainPatterns.statistics.proportion as number[])
+                  ?.map((ratio: number, i: number) => ({ ratio, index: i }))
+                  .sort((a: { ratio: number }, b: { ratio: number }) => b.ratio - a.ratio)
+                  .map(({ ratio, index: i }: { ratio: number; index: number }) => {
+                  const aiFreq = (explainPatterns.statistics.aiCount as number[])?.[i] ?? 0;
+                  const humanFreq = (explainPatterns.statistics.humanCount as number[])?.[i] ?? 0;
                   const total = aiFreq + humanFreq;
                   const aiPct = total > 0 ? (aiFreq / total) * 100 : 0;
                   const isHighRatio = ratio >= 10;
                   const isMedRatio = ratio >= 5;
-                  const phrase = ep.phrase;
+                  const phrase = explainPhrases[i] ?? `Pattern ${i + 1}`;
                   
                   return (
                     <div key={i} className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">

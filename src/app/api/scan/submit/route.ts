@@ -87,6 +87,7 @@ async function handleSubmit() {
           articleId: article.id,
           webhookUrl,
           sandbox: process.env.NODE_ENV !== 'production',
+          sensitivityLevel: article.aiDetectionLevel ?? 2,
         });
 
         // Update article status and store content for AI text extraction

@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { StatusBadge } from '@/components/status-badge';
 import { ScoreGauge } from '@/components/score-gauge';
+import { Sparkline } from '@/components/sparkline';
 import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import {
   ArrowLeft,
   FileText,
@@ -13,6 +15,12 @@ import {
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
+
+const levelBadgeColors: Record<number, string> = {
+  1: 'bg-slate-600/30 text-slate-400',
+  2: 'bg-blue-500/20 text-blue-400',
+  3: 'bg-amber-500/20 text-amber-400',
+};
 
 export default async function WriterDetailPage({
   params,
@@ -46,6 +54,39 @@ export default async function WriterDetailPage({
   const flaggedCount = writer.articles.filter(
     (a) => a.status === 'FLAGGED'
   ).length;
+
+  // Get trend data: last 20 completed articles ordered by detected date
+  const trendArticles = await prisma.article.findMany({
+    where: {
+      writerId: id,
+      status: { in: ['COMPLETED', 'REVIEWED', 'APPROVED', 'FLAGGED'] },
+    },
+    orderBy: { detectedAt: 'asc' },
+    take: 20,
+    select: {
+      detectedAt: true,
+      scanResult: {
+        select: {
+          aiScore: true,
+          plagiarismScore: true,
+        },
+      },
+    },
+  });
+
+  const aiTrendData = trendArticles
+    .filter((a) => a.scanResult)
+    .map((a) => ({
+      label: format(new Date(a.detectedAt), 'MMM d'),
+      value: (a.scanResult!.aiScore * 100),
+    }));
+
+  const plagTrendData = trendArticles
+    .filter((a) => a.scanResult)
+    .map((a) => ({
+      label: format(new Date(a.detectedAt), 'MMM d'),
+      value: a.scanResult!.plagiarismScore,
+    }));
 
   return (
     <div className="space-y-8">
@@ -96,9 +137,13 @@ export default async function WriterDetailPage({
               size="md"
             />
             <ScoreGauge
-              score={writer.avgPlagiarism}
-              label="Plagiarism"
-              invertColors
+              score={100 - writer.avgPlagiarism}
+              label="Originality"
+              size="md"
+            />
+            <ScoreGauge
+              score={writer.avgGrammarScore}
+              label="Grammar"
               size="md"
             />
           </div>
@@ -123,14 +168,27 @@ export default async function WriterDetailPage({
         />
       </div>
 
-      {/* Score Trend Placeholder */}
+      {/* Score Trends */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
         <h2 className="mb-4 text-lg font-semibold text-slate-100">
           Score Trends
         </h2>
-        <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-slate-700 text-sm text-slate-500">
-          📈 Score trend chart — coming soon
-        </div>
+        {aiTrendData.length >= 2 ? (
+          <div className="space-y-4">
+            <div>
+              <p className="mb-1 text-xs font-medium text-red-400">AI Detection %</p>
+              <Sparkline data={aiTrendData} color="#f87171" width={600} height={60} />
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-amber-400">Plagiarism %</p>
+              <Sparkline data={plagTrendData} color="#fbbf24" width={600} height={60} />
+            </div>
+          </div>
+        ) : (
+          <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-slate-700 text-sm text-slate-500">
+            📈 Not enough completed articles for trend data yet
+          </div>
+        )}
       </div>
 
       {/* Article List */}
@@ -147,47 +205,61 @@ export default async function WriterDetailPage({
                 <th className="pb-3 pr-4 font-medium text-center">Status</th>
                 <th className="pb-3 pr-4 font-medium text-center">AI %</th>
                 <th className="pb-3 pr-4 font-medium text-center">Plagiarism %</th>
+                <th className="pb-3 pr-4 font-medium text-center">Grammar</th>
                 <th className="pb-3 font-medium">Detected</th>
               </tr>
             </thead>
             <tbody>
-              {writer.articles.map((article) => (
-                <tr
-                  key={article.id}
-                  className="border-b border-slate-700/50 hover:bg-slate-700/20"
-                >
-                  <td className="py-3 pr-4">
-                    <Link
-                      href={`/articles/${article.id}`}
-                      className="font-medium text-slate-200 hover:text-teal-400"
-                    >
-                      {article.title}
-                    </Link>
-                  </td>
-                  <td className="py-3 pr-4 text-center">
-                    <StatusBadge status={article.status} />
-                  </td>
-                  <td className="py-3 pr-4 text-center text-slate-300">
-                    {article.scanResult
-                      ? `${(article.scanResult.aiScore * 100).toFixed(0)}%`
-                      : '—'}
-                  </td>
-                  <td className="py-3 pr-4 text-center text-slate-300">
-                    {article.scanResult
-                      ? `${article.scanResult.plagiarismScore.toFixed(1)}%`
-                      : '—'}
-                  </td>
-                  <td className="py-3 text-slate-500">
-                    {formatDistanceToNow(new Date(article.detectedAt), {
-                      addSuffix: true,
-                    })}
-                  </td>
-                </tr>
-              ))}
+              {writer.articles.map((article) => {
+                const level = article.aiDetectionLevel ?? 2;
+                return (
+                  <tr
+                    key={article.id}
+                    className="border-b border-slate-700/50 hover:bg-slate-700/20"
+                  >
+                    <td className="py-3 pr-4">
+                      <Link
+                        href={`/articles/${article.id}`}
+                        className="font-medium text-slate-200 hover:text-teal-400"
+                      >
+                        {article.title}
+                      </Link>
+                    </td>
+                    <td className="py-3 pr-4 text-center">
+                      <StatusBadge status={article.status} />
+                    </td>
+                    <td className="py-3 pr-4 text-center text-slate-300">
+                      {article.scanResult ? (
+                        <span className="inline-flex items-center gap-1">
+                          {(article.scanResult.aiScore * 100).toFixed(0)}%
+                          <span className={`inline-flex rounded px-1 py-0.5 text-[10px] font-semibold leading-none ${levelBadgeColors[level] ?? levelBadgeColors[2]}`}>
+                            L{level}
+                          </span>
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="py-3 pr-4 text-center text-slate-300">
+                      {article.scanResult
+                        ? `${article.scanResult.plagiarismScore.toFixed(1)}%`
+                        : '—'}
+                    </td>
+                    <td className="py-3 pr-4 text-center text-slate-300">
+                      {article.scanResult?.grammarScore != null
+                        ? article.scanResult.grammarScore.toFixed(0)
+                        : '—'}
+                    </td>
+                    <td className="py-3 text-slate-500">
+                      {formatDistanceToNow(new Date(article.detectedAt), {
+                        addSuffix: true,
+                      })}
+                    </td>
+                  </tr>
+                );
+              })}
               {writer.articles.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="py-8 text-center text-slate-500"
                   >
                     No articles detected for this writer yet
