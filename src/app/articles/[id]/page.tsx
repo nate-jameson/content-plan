@@ -402,15 +402,65 @@ export default async function ArticleDetailPage({
                 </div>
               </div>
               <HighlightedArticle
-                paragraphs={aiParas.map(p => ({
-                  id: p.id,
-                  classification: p.classification,
-                  aiProbability: p.aiProbability,
-                  text: p.text,
-                  paragraphIndex: p.paragraphIndex,
-                }))}
-                explainPhrases={explainPhrases}
-                cleanContent={cleanContent}
+                paragraphs={(() => {
+                  // Pre-compute paragraph ranges and local phrases SERVER-SIDE
+                  // to avoid fragile indexOf matching on the client
+                  const mapped = aiParas.map(p => {
+                    // Strip BOM from para text before matching (DB text may have BOM)
+                    const cleanParaText = p.text
+                      ? p.text.replace(/\ufeff/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+                      : '';
+                    return {
+                      id: p.id,
+                      classification: p.classification,
+                      aiProbability: p.aiProbability,
+                      text: cleanParaText || p.text,
+                      paragraphIndex: p.paragraphIndex,
+                      localPhrases: [] as { localStart: number; localEnd: number; phrase: string; ratio: number; aiFreq: number; humanFreq: number }[],
+                    };
+                  });
+
+                  // Find each paragraph's position in cleanContent
+                  let searchFrom = 0;
+                  const paraRanges: { start: number; end: number }[] = [];
+                  for (const mp of mapped) {
+                    const t = mp.text?.trim() || '';
+                    if (!t) {
+                      paraRanges.push({ start: -1, end: -1 });
+                      continue;
+                    }
+                    let idx = cleanContent.indexOf(t, searchFrom);
+                    if (idx === -1 && t.length > 50) {
+                      idx = cleanContent.indexOf(t.substring(0, 50), searchFrom);
+                    }
+                    if (idx >= 0) {
+                      paraRanges.push({ start: idx, end: idx + t.length });
+                      searchFrom = idx + t.length;
+                    } else {
+                      paraRanges.push({ start: -1, end: -1 });
+                    }
+                  }
+
+                  // Map phrases to paragraphs with local offsets
+                  for (let i = 0; i < mapped.length; i++) {
+                    const range = paraRanges[i];
+                    if (range.start < 0) continue;
+                    for (const ep of explainPhrases) {
+                      if (ep.charStart >= range.start && ep.charEnd <= range.end) {
+                        mapped[i].localPhrases.push({
+                          localStart: ep.charStart - range.start,
+                          localEnd: ep.charEnd - range.start,
+                          phrase: ep.phrase,
+                          ratio: ep.ratio,
+                          aiFreq: ep.aiFreq,
+                          humanFreq: ep.humanFreq,
+                        });
+                      }
+                    }
+                  }
+
+                  return mapped;
+                })()}
               />
             </div>
           </div>

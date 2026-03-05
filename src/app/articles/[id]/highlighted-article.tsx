@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import { Bot, AlertTriangle, User, Info } from 'lucide-react';
 
-interface ExplainPhrase {
+interface LocalPhrase {
+  localStart: number;
+  localEnd: number;
   phrase: string;
   ratio: number;
   aiFreq: number;
   humanFreq: number;
-  charStart: number;
-  charEnd: number;
 }
 
 interface Paragraph {
@@ -18,52 +18,11 @@ interface Paragraph {
   aiProbability: number;
   text: string | null;
   paragraphIndex: number;
+  localPhrases: LocalPhrase[];
 }
 
 interface HighlightedArticleProps {
   paragraphs: Paragraph[];
-  explainPhrases: ExplainPhrase[];
-  cleanContent: string;
-}
-
-// Compute which character range each paragraph covers in the full content
-function mapParagraphRanges(paragraphs: Paragraph[], fullContent: string) {
-  const ranges: { start: number; end: number }[] = [];
-  let searchFrom = 0;
-
-  for (const para of paragraphs) {
-    if (!para.text) {
-      ranges.push({ start: -1, end: -1 });
-      continue;
-    }
-
-    // Find this paragraph's text in the full content
-    // Use a trimmed version for matching to handle whitespace differences
-    const trimmedPara = para.text.trim();
-    if (!trimmedPara) {
-      ranges.push({ start: -1, end: -1 });
-      continue;
-    }
-
-    // Try exact match first
-    let idx = fullContent.indexOf(trimmedPara, searchFrom);
-
-    // If not found, try first 50 chars (paragraph text may have been truncated differently)
-    if (idx === -1 && trimmedPara.length > 50) {
-      const prefix = trimmedPara.substring(0, 50);
-      idx = fullContent.indexOf(prefix, searchFrom);
-    }
-
-    if (idx >= 0) {
-      const end = idx + trimmedPara.length;
-      ranges.push({ start: idx, end });
-      searchFrom = end;
-    } else {
-      ranges.push({ start: -1, end: -1 });
-    }
-  }
-
-  return ranges;
 }
 
 function HighlightedParagraph({
@@ -71,7 +30,7 @@ function HighlightedParagraph({
   phrases,
 }: {
   text: string;
-  phrases: { localStart: number; localEnd: number; phrase: ExplainPhrase }[];
+  phrases: LocalPhrase[];
 }) {
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
 
@@ -79,9 +38,9 @@ function HighlightedParagraph({
     return <span>{text}</span>;
   }
 
-  // Sort by position, remove overlaps
+  // Sort by position, remove overlaps, validate bounds
   const sorted = [...phrases].sort((a, b) => a.localStart - b.localStart);
-  const filtered: typeof sorted = [];
+  const filtered: LocalPhrase[] = [];
   let lastEnd = -1;
   for (const m of sorted) {
     if (m.localStart >= lastEnd && m.localStart >= 0 && m.localEnd <= text.length) {
@@ -98,9 +57,8 @@ function HighlightedParagraph({
       segments.push(<span key={`t-${i}`}>{text.slice(cursor, m.localStart)}</span>);
     }
 
-    const p = m.phrase;
-    const isHigh = p.ratio >= 10;
-    const isMed = p.ratio >= 5;
+    const isHigh = m.ratio >= 10;
+    const isMed = m.ratio >= 5;
 
     segments.push(
       <span
@@ -123,12 +81,12 @@ function HighlightedParagraph({
               <span className={`font-bold ${
                 isHigh ? 'text-red-400' : isMed ? 'text-yellow-400' : 'text-slate-300'
               }`}>
-                {p.ratio.toFixed(1)}× more likely AI
+                {m.ratio.toFixed(1)}× more likely AI
               </span>
             </span>
             <span className="mt-1 flex gap-3 text-slate-500">
-              <span>AI: {p.aiFreq.toFixed(1)}/1M</span>
-              <span>Human: {p.humanFreq.toFixed(1)}/1M</span>
+              <span>AI: {m.aiFreq.toFixed(1)}/1M</span>
+              <span>Human: {m.humanFreq.toFixed(1)}/1M</span>
             </span>
           </span>
         )}
@@ -145,14 +103,7 @@ function HighlightedParagraph({
   return <span>{segments}</span>;
 }
 
-export function HighlightedArticle({
-  paragraphs,
-  explainPhrases,
-  cleanContent,
-}: HighlightedArticleProps) {
-  // Map each paragraph to its character range in the full content
-  const paraRanges = mapParagraphRanges(paragraphs, cleanContent);
-
+export function HighlightedArticle({ paragraphs }: HighlightedArticleProps) {
   return (
     <div className="prose prose-sm prose-invert max-w-none space-y-0">
       {paragraphs.map((para, idx) => {
@@ -171,23 +122,6 @@ export function HighlightedArticle({
               [Section {idx + 1} — text not available for pre-existing articles]
             </div>
           );
-        }
-
-        // Find which explain phrases fall within this paragraph's range
-        const paraRange = paraRanges[idx];
-        const localPhrases: { localStart: number; localEnd: number; phrase: ExplainPhrase }[] = [];
-
-        if (paraRange.start >= 0) {
-          for (const ep of explainPhrases) {
-            // Check if this phrase overlaps with this paragraph
-            if (ep.charStart >= paraRange.start && ep.charEnd <= paraRange.end) {
-              localPhrases.push({
-                localStart: ep.charStart - paraRange.start,
-                localEnd: ep.charEnd - paraRange.start,
-                phrase: ep,
-              });
-            }
-          }
         }
 
         return (
@@ -240,7 +174,7 @@ export function HighlightedArticle({
             >
               <HighlightedParagraph
                 text={para.text!}
-                phrases={localPhrases}
+                phrases={para.localPhrases}
               />
             </p>
           </div>
