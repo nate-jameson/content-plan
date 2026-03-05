@@ -104,19 +104,23 @@ async function handleAiDetection(copyleaksScanId: string, request: NextRequest) 
       const classification = result.classification === 2 ? 'ai' : 'human';
       const probability = result.probability ?? (classification === 'ai' ? 1 : 0);
       
-      // Extract actual text using character positions from Copyleaks
+      // Extract actual text using WORD positions from Copyleaks (immune to BOM/encoding issues)
       let extractedText = '';
       if (originalContent && result.matches?.length > 0) {
-        // Collect all character ranges for this result
+        // Clean content: strip BOM, normalize line endings
+        const cleanContent = originalContent.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+        // Tokenize into words (split on whitespace)
+        const words = cleanContent.split(/\s+/).filter(w => w.length > 0);
+        
         const segments: string[] = [];
         for (const match of result.matches) {
-          const starts = match?.text?.chars?.starts ?? [];
-          const lengths = match?.text?.chars?.lengths ?? [];
-          for (let i = 0; i < starts.length; i++) {
-            const start = starts[i];
-            const length = lengths[i] ?? 0;
-            if (start >= 0 && length > 0 && start + length <= originalContent.length) {
-              segments.push(originalContent.substring(start, start + length));
+          const wordStarts = match?.text?.words?.starts ?? [];
+          const wordLengths = match?.text?.words?.lengths ?? [];
+          for (let i = 0; i < wordStarts.length; i++) {
+            const startIdx = wordStarts[i];
+            const wordLen = wordLengths[i] ?? 0;
+            if (startIdx >= 0 && wordLen > 0 && startIdx + wordLen <= words.length) {
+              segments.push(words.slice(startIdx, startIdx + wordLen).join(' '));
             }
           }
         }

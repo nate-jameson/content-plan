@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { StatusBadge } from '@/components/status-badge';
 import { ScoreGauge } from '@/components/score-gauge';
 import { ArticleActions } from './article-actions';
+import { HighlightedArticle } from '@/components/HighlightedArticle';
 import { format } from 'date-fns';
 import {
   ArrowLeft,
@@ -91,16 +92,76 @@ export default async function ArticleDetailPage({
   const explainPatterns = rawResponse?.explain?.patterns;
   const articleContent = article.content ?? '';
 
-  // Extract actual flagged phrases from character positions
+  // Extract actual flagged phrases using WORD positions (immune to BOM/encoding issues)
+  const cleanContent = articleContent.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  const contentWords = cleanContent.split(/\s+/).filter((w: string) => w.length > 0);
+  
   const explainPhrases: string[] = [];
-  if (explainPatterns?.text?.chars?.starts && articleContent) {
-    const starts = explainPatterns.text.chars.starts as number[];
-    const lengths = explainPatterns.text.chars.lengths as number[];
-    for (let i = 0; i < starts.length; i++) {
-      const start = starts[i];
-      const len = lengths[i] ?? 0;
-      const phrase = articleContent.substring(start, start + len).trim();
-      explainPhrases.push(phrase || `[Position ${start}]`);
+  const explainWordStarts = explainPatterns?.text?.words?.starts as number[] | undefined;
+  const explainWordLengths = explainPatterns?.text?.words?.lengths as number[] | undefined;
+  if (explainWordStarts && explainWordLengths && contentWords.length > 0) {
+    for (let i = 0; i < explainWordStarts.length; i++) {
+      const startIdx = explainWordStarts[i];
+      const wordLen = explainWordLengths[i] ?? 0;
+      if (startIdx >= 0 && wordLen > 0 && startIdx + wordLen <= contentWords.length) {
+        explainPhrases.push(contentWords.slice(startIdx, startIdx + wordLen).join(' '));
+      } else {
+        explainPhrases.push(`[Pattern ${i + 1}]`);
+      }
+    }
+  }
+
+  // ── Compute paragraph ranges for full-article highlighting ──
+  const paragraphRanges: Array<{ startChar: number; endChar: number; classification: string; aiProbability: number }> = [];
+  if (cleanContent && aiParas.length > 0) {
+    for (const para of aiParas) {
+      const paraText = (para.text ?? '').replace(/^\uFEFF/, '');
+      if (!paraText || paraText.startsWith('[Section')) continue;
+      const idx = cleanContent.indexOf(paraText, paragraphRanges.length > 0 ? paragraphRanges[paragraphRanges.length - 1]?.endChar ?? 0 : 0);
+      if (idx >= 0) {
+        paragraphRanges.push({
+          startChar: idx,
+          endChar: idx + paraText.length,
+          classification: para.classification,
+          aiProbability: para.aiProbability,
+        });
+      }
+    }
+  }
+
+  // ── Compute phrase highlight positions for full-article view ──
+  const phraseHighlights: Array<{ globalStart: number; globalEnd: number; phrase: string; ratio: number; aiFreq: number; humanFreq: number }> = [];
+  if (explainWordStarts && explainWordLengths && cleanContent && contentWords.length > 0) {
+    // Build a map from word index to character position in cleanContent
+    const wordCharPositions: number[] = [];
+    let searchFrom = 0;
+    for (const word of contentWords) {
+      const pos = cleanContent.indexOf(word, searchFrom);
+      wordCharPositions.push(pos >= 0 ? pos : searchFrom);
+      searchFrom = (pos >= 0 ? pos : searchFrom) + word.length;
+    }
+
+    const proportions = (explainPatterns?.statistics?.proportion as number[]) ?? [];
+    const aiCounts = (explainPatterns?.statistics?.aiCount as number[]) ?? [];
+    const humanCounts = (explainPatterns?.statistics?.humanCount as number[]) ?? [];
+
+    for (let i = 0; i < explainWordStarts.length; i++) {
+      const startWordIdx = explainWordStarts[i];
+      const wordLen = explainWordLengths[i] ?? 0;
+      const endWordIdx = startWordIdx + wordLen - 1;
+      if (startWordIdx >= 0 && endWordIdx < contentWords.length) {
+        const globalStart = wordCharPositions[startWordIdx];
+        const lastWord = contentWords[endWordIdx];
+        const globalEnd = wordCharPositions[endWordIdx] + lastWord.length;
+        phraseHighlights.push({
+          globalStart,
+          globalEnd,
+          phrase: explainPhrases[i] ?? '',
+          ratio: proportions[i] ?? 0,
+          aiFreq: aiCounts[i] ?? 0,
+          humanFreq: humanCounts[i] ?? 0,
+        });
+      }
     }
   }
 
@@ -500,6 +561,35 @@ export default async function ArticleDetailPage({
               })}
             </div>
           </div>
+
+          {/* ── Full Article with Inline Highlighting ── */}
+          {cleanContent && paragraphRanges.length > 0 && (
+            <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-200">
+                <BookOpen className="h-5 w-5 text-teal-500" />
+                Full Article — AI Highlighting
+              </h2>
+              <p className="mb-4 text-xs text-slate-500">
+                Paragraphs color-coded by classification. Dotted underlines mark specific AI-flagged phrases — hover for details.
+              </p>
+              <div className="mb-3 flex flex-wrap gap-4 text-xs text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-1 rounded-sm bg-red-500/40" /> AI-generated
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-1 rounded-sm bg-yellow-500/40" /> Mixed
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-1 rounded-sm bg-green-500/20" /> Human
+                </span>
+              </div>
+              <HighlightedArticle
+                content={cleanContent}
+                paragraphRanges={paragraphRanges}
+                phraseHighlights={phraseHighlights}
+              />
+            </div>
+          )}
 
           {/* AI Pattern Analysis (if explain data available) */}
           {explainPatterns?.statistics && (
