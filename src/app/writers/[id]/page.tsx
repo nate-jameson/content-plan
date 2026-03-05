@@ -100,7 +100,7 @@ export default async function WriterDetailPage({
       </Link>
 
       {/* Profile Header */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-xl font-bold text-white">
@@ -112,7 +112,7 @@ export default async function WriterDetailPage({
                 .slice(0, 2)}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-100">
+              <h1 className="text-2xl font-bold text-slate-200">
                 {writer.name}
               </h1>
               {writer.email && <p className="text-sm text-slate-400">{writer.email}</p>}
@@ -169,14 +169,14 @@ export default async function WriterDetailPage({
       </div>
 
       {/* Score Trends */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-slate-100">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+        <h2 className="mb-4 text-lg font-semibold text-slate-200">
           Score Trends
         </h2>
         {aiTrendData.length >= 2 ? (
           <div className="space-y-4">
             <div>
-              <p className="mb-1 text-xs font-medium text-red-400">AI Detection %</p>
+              <p className="mb-1 text-xs font-medium text-red-300">AI Detection %</p>
               <Sparkline data={aiTrendData} color="#f87171" width={600} height={60} />
             </div>
             <div>
@@ -192,8 +192,8 @@ export default async function WriterDetailPage({
       </div>
 
       {/* Article List */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-slate-100">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+        <h2 className="mb-4 text-lg font-semibold text-slate-200">
           Articles ({writer.articles.length})
         </h2>
 
@@ -284,11 +284,11 @@ function StatCard({
   warn?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-4">
+    <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-4">
       <p className="text-xs text-slate-400">{label}</p>
       <p
         className={`mt-1 text-xl font-bold ${
-          warn ? 'text-red-400' : 'text-slate-100'
+          warn ? 'text-red-300' : 'text-slate-200'
         }`}
       >
         {value}

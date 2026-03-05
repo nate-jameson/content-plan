@@ -11,7 +11,7 @@ const statusConfig: Record<
   },
   QUEUED: {
     label: 'Queued',
-    className: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+    className: 'bg-yellow-400/10 text-yellow-300 border-yellow-500/20',
   },
   SCANNING: {
     label: 'Scanning',
@@ -27,15 +27,15 @@ const statusConfig: Record<
   },
   APPROVED: {
     label: 'Approved',
-    className: 'bg-green-500/10 text-green-400 border-green-500/20',
+    className: 'bg-green-400/10 text-green-300 border-green-500/20',
   },
   FLAGGED: {
     label: 'Flagged',
-    className: 'bg-red-500/10 text-red-400 border-red-500/20',
+    className: 'bg-red-400/10 text-red-300 border-red-500/20',
   },
   ERROR: {
     label: 'Error',
-    className: 'bg-red-500/10 text-red-300 border-red-500/20',
+    className: 'bg-red-400/10 text-red-300 border-red-500/20',
   },
 };
 

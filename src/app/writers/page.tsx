@@ -19,7 +19,7 @@ export default async function WritersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Writers</h1>
+          <h1 className="text-2xl font-bold text-slate-200">Writers</h1>
           <p className="text-sm text-slate-400">
             Manage content writers and their Google Drive folders
           </p>
@@ -30,7 +30,7 @@ export default async function WritersPage() {
       <AddWriterForm />
 
       {/* Writers List */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/60">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -53,7 +53,7 @@ export default async function WritersPage() {
                   <td className="p-4">
                     <Link
                       href={`/writers/${writer.id}`}
-                      className="font-medium text-slate-100 hover:text-teal-400"
+                      className="font-medium text-slate-200 hover:text-teal-400"
                     >
                       {writer.name}
                     </Link>
@@ -80,10 +80,10 @@ export default async function WritersPage() {
                     <span
                       className={
                         writer.avgAiScore > 0.5
-                          ? 'text-red-400'
+                          ? 'text-red-300'
                           : writer.avgAiScore > 0.2
-                          ? 'text-yellow-400'
-                          : 'text-green-400'
+                          ? 'text-yellow-300'
+                          : 'text-green-300'
                       }
                     >
                       {(writer.avgAiScore * 100).toFixed(0)}%
@@ -93,10 +93,10 @@ export default async function WritersPage() {
                     <span
                       className={
                         writer.avgPlagiarism > 20
-                          ? 'text-red-400'
+                          ? 'text-red-300'
                           : writer.avgPlagiarism > 10
-                          ? 'text-yellow-400'
-                          : 'text-green-400'
+                          ? 'text-yellow-300'
+                          : 'text-green-300'
                       }
                     >
                       {writer.avgPlagiarism.toFixed(1)}%

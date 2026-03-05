@@ -106,19 +106,19 @@ export default function SettingsPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Settings</h1>
+        <h1 className="text-2xl font-bold text-slate-200">Settings</h1>
         <p className="text-sm text-slate-400">System configuration, team access, and connection status</p>
       </div>
 
       {/* Google Drive OAuth result banners */}
       {driveConnected && (
-        <div className="flex items-center gap-2 rounded-lg border border-green-800 bg-green-900/20 p-4 text-sm text-green-400">
+        <div className="flex items-center gap-2 rounded-lg border border-green-800 bg-green-900/20 p-4 text-sm text-green-300">
           <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
           <span>Google Drive connected successfully! You can now monitor writer folders.</span>
         </div>
       )}
       {driveError && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-800 bg-red-900/20 p-4 text-sm text-red-400">
+        <div className="flex items-center gap-2 rounded-lg border border-red-800 bg-red-900/20 p-4 text-sm text-red-300">
           <AlertCircle className="h-5 w-5 flex-shrink-0" />
           <span>
             Google Drive connection failed: {driveError === 'no_refresh_token'
@@ -129,8 +129,8 @@ export default function SettingsPage() {
       )}
 
       {/* Team Access */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-100">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-200">
           <Users className="h-5 w-5 text-teal-400" />
           Team Access
         </h2>
@@ -210,7 +210,7 @@ export default function SettingsPage() {
               onChange={(e) => setNewEmail(e.target.value)}
               placeholder="editor@jmsn.com"
               required
-              className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-teal-500"
+              className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-teal-500"
             />
           </div>
           <div className="min-w-[160px]">
@@ -220,7 +220,7 @@ export default function SettingsPage() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Optional"
-              className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none focus:border-teal-500"
+              className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-teal-500"
             />
           </div>
           <div className="min-w-[120px]">
@@ -228,7 +228,7 @@ export default function SettingsPage() {
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-slate-100 outline-none focus:border-teal-500"
+              className="w-full rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-slate-200 outline-none focus:border-teal-500"
             >
               <option value="editor">Editor</option>
               <option value="admin">Admin</option>
@@ -243,12 +243,12 @@ export default function SettingsPage() {
             Add User
           </button>
         </form>
-        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+        {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
       </div>
 
       {/* Connection Status */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-100">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-200">
           <Settings className="h-5 w-5 text-teal-400" />
           Connection Status
         </h2>
@@ -298,8 +298,8 @@ export default function SettingsPage() {
       </div>
 
       {/* About */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-100">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-200">
           <Info className="h-5 w-5 text-teal-400" />
           About
         </h2>
@@ -334,7 +334,7 @@ function StatusCard({ icon: Icon, label, status, detail, missing, account, actio
         </div>
       ) : status === 'connected' ? (
         <div>
-          <p className="flex items-center gap-1 text-sm text-green-400">
+          <p className="flex items-center gap-1 text-sm text-green-300">
             <CheckCircle2 className="h-3.5 w-3.5" /> Connected
           </p>
           {(detail || account) && (
@@ -350,7 +350,7 @@ function StatusCard({ icon: Icon, label, status, detail, missing, account, actio
         </div>
       ) : status === 'error' ? (
         <div>
-          <p className="flex items-center gap-1 text-sm text-red-400">
+          <p className="flex items-center gap-1 text-sm text-red-300">
             <XCircle className="h-3.5 w-3.5" /> Error
           </p>
           {detail && <p className="mt-1 text-xs text-red-300/70">{detail}</p>}

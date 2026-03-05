@@ -57,6 +57,7 @@ async function getDashboardData() {
     pendingReview,
     avgAiScore: avgScores._avg.aiScore ?? 0,
     avgPlagiarism: avgScores._avg.plagiarismScore ?? 0,
+    avgGrammar: avgScores._avg.grammarScore ?? 0,
     writers,
     recentArticles,
   };
@@ -69,7 +70,7 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-slate-200">Dashboard</h1>
         <p className="text-sm text-slate-400">
           Content quality monitoring across all writers
         </p>
@@ -93,7 +94,7 @@ export default async function DashboardPage() {
           value={`${data.avgPlagiarism.toFixed(1)}%`}
         />
         <SummaryCard
-          icon={<Clock className="h-5 w-5 text-yellow-400" />}
+          icon={<Clock className="h-5 w-5 text-yellow-300" />}
           label="Pending Review"
           value={data.pendingReview}
         />
@@ -102,9 +103,9 @@ export default async function DashboardPage() {
       {/* Writer Leaderboard + Recent Articles */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         {/* Writer Leaderboard */}
-        <div className="xl:col-span-2 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+        <div className="xl:col-span-2 rounded-xl border border-slate-700 bg-slate-800/60 p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-100">
+            <h2 className="text-lg font-semibold text-slate-200">
               Writer Leaderboard
             </h2>
             <Link
@@ -123,6 +124,7 @@ export default async function DashboardPage() {
                   <th className="pb-3 pr-4 font-medium text-center">Articles</th>
                   <th className="pb-3 pr-4 font-medium text-center">Avg AI %</th>
                   <th className="pb-3 pr-4 font-medium text-center">Avg Plagiarism %</th>
+                  <th className="pb-3 pr-4 font-medium text-center">Avg Grammar</th>
                   <th className="pb-3 font-medium text-center">Status</th>
                 </tr>
               </thead>
@@ -135,7 +137,7 @@ export default async function DashboardPage() {
                     <td className="py-3 pr-4">
                       <Link
                         href={`/writers/${writer.id}`}
-                        className="font-medium text-slate-100 hover:text-teal-400"
+                        className="font-medium text-slate-200 hover:text-teal-400"
                       >
                         {writer.name}
                       </Link>
@@ -147,10 +149,10 @@ export default async function DashboardPage() {
                       <span
                         className={
                           writer.avgAiScore > 0.5
-                            ? 'text-red-400'
+                            ? 'text-red-300'
                             : writer.avgAiScore > 0.2
-                            ? 'text-yellow-400'
-                            : 'text-green-400'
+                            ? 'text-yellow-300'
+                            : 'text-green-300'
                         }
                       >
                         {(writer.avgAiScore * 100).toFixed(0)}%
@@ -160,13 +162,26 @@ export default async function DashboardPage() {
                       <span
                         className={
                           writer.avgPlagiarism > 20
-                            ? 'text-red-400'
+                            ? 'text-red-300'
                             : writer.avgPlagiarism > 10
-                            ? 'text-yellow-400'
-                            : 'text-green-400'
+                            ? 'text-yellow-300'
+                            : 'text-green-300'
                         }
                       >
                         {writer.avgPlagiarism.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4 text-center">
+                      <span
+                        className={
+                          writer.avgGrammarScore >= 80
+                            ? 'text-green-300'
+                            : writer.avgGrammarScore >= 50
+                            ? 'text-yellow-300'
+                            : 'text-red-300'
+                        }
+                      >
+                        {writer.avgGrammarScore.toFixed(0)}
                       </span>
                     </td>
                     <td className="py-3 text-center">
@@ -180,7 +195,7 @@ export default async function DashboardPage() {
                 ))}
                 {data.writers.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-500">
+                    <td colSpan={6} className="py-8 text-center text-slate-500">
                       No writers added yet.{' '}
                       <Link href="/writers" className="text-teal-500 hover:underline">
                         Add your first writer
@@ -194,8 +209,8 @@ export default async function DashboardPage() {
         </div>
 
         {/* Recent Articles */}
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-          <h2 className="mb-4 text-lg font-semibold text-slate-100">
+        <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+          <h2 className="mb-4 text-lg font-semibold text-slate-200">
             Recent Articles
           </h2>
           <div className="space-y-3">
@@ -225,6 +240,9 @@ export default async function DashboardPage() {
                     <span>
                       Plag: {article.scanResult.plagiarismScore.toFixed(1)}%
                     </span>
+                    {article.scanResult.grammarScore != null && (
+                      <span>Grammar: {article.scanResult.grammarScore.toFixed(0)}</span>
+                    )}
                   </div>
                 )}
               </Link>
@@ -251,12 +269,12 @@ function SummaryCard({
   value: string | number;
 }) {
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-5">
+    <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-5">
       <div className="flex items-center gap-3">
         {icon}
         <span className="text-sm text-slate-400">{label}</span>
       </div>
-      <p className="mt-2 text-2xl font-bold text-slate-100">{value}</p>
+      <p className="mt-2 text-2xl font-bold text-slate-200">{value}</p>
     </div>
   );
 }

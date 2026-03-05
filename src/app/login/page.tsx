@@ -48,18 +48,18 @@ function LoginForm() {
   // Check your email state
   if (verify) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
+      <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
         <div className="w-full max-w-md space-y-8 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-teal-500/10">
             <Mail className="h-8 w-8 text-teal-500" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">Check your email</h1>
+            <h1 className="text-2xl font-bold text-slate-200">Check your email</h1>
             <p className="mt-3 text-slate-400">
               We sent a magic link to your inbox. Click it to sign in — no password needed.
             </p>
           </div>
-          <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+          <div className="rounded-lg border border-slate-700 bg-slate-800/60 p-4">
             <div className="flex items-start gap-3 text-left">
               <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-teal-500" />
               <div className="text-sm text-slate-300">
@@ -80,21 +80,21 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
       <div className="w-full max-w-md space-y-8">
         {/* Logo */}
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-teal-500/10">
             <ShieldCheck className="h-8 w-8 text-teal-500" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-100">ContentReview</h1>
+          <h1 className="text-2xl font-bold text-slate-200">ContentReview</h1>
           <p className="mt-2 text-sm text-slate-400">Sign in with your email to continue</p>
         </div>
 
         {/* Error messages */}
         {(error || authError) && (
           <div className="flex items-start gap-3 rounded-lg border border-red-800/50 bg-red-900/20 p-4">
-            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-400" />
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-300" />
             <p className="text-sm text-red-300">
               {error || (authError === 'AccessDenied'
                 ? 'Access denied. Your email is not on the approved list.'
@@ -117,7 +117,7 @@ function LoginForm() {
               placeholder="you@jmsn.com"
               required
               autoFocus
-              className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 text-slate-100 placeholder-slate-500 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-4 py-3 text-slate-200 placeholder-slate-500 outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-colors"
             />
           </div>
           <button
@@ -150,7 +150,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+      <div className="flex min-h-screen items-center justify-center bg-slate-900">
         <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
       </div>
     }>

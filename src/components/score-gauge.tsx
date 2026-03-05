@@ -12,9 +12,9 @@ interface ScoreGaugeProps {
 
 function getColor(score: number, invert: boolean): string {
   const effective = invert ? 100 - score : score;
-  if (effective >= 80) return 'text-green-400';
-  if (effective >= 50) return 'text-yellow-400';
-  return 'text-red-400';
+  if (effective >= 80) return 'text-green-300';
+  if (effective >= 50) return 'text-yellow-300';
+  return 'text-red-300';
 }
 
 function getStrokeColor(score: number, invert: boolean): string {

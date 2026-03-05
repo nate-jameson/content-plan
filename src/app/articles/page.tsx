@@ -49,7 +49,7 @@ export default async function ArticlesPage({
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Articles</h1>
+        <h1 className="text-2xl font-bold text-slate-200">Articles</h1>
         <p className="text-sm text-slate-400">
           All detected articles and their scan results
         </p>
@@ -76,7 +76,7 @@ export default async function ArticlesPage({
       </div>
 
       {/* Articles Table */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/60">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

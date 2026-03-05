@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: 'Content Review Dashboard',
-  description: 'Monitor writer content for plagiarism and AI detection',
+  description: 'Monitor writer content for plagiarism, AI detection, and grammar quality',
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-touch-icon.png',
@@ -26,7 +26,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} font-sans bg-slate-950 text-slate-100 antialiased`}>
+      <body className={`${inter.variable} font-sans bg-slate-900 text-slate-200 antialiased`}>
         <SessionProvider session={session}>
           {isLoggedIn ? (
             <div className="flex min-h-screen">

@@ -113,24 +113,24 @@ export default async function ArticleDetailPage({
       color: 'red',
       label: 'High AI Risk',
       icon: AlertTriangle,
-      bg: 'bg-red-500/10 border-red-500/30',
-      text: 'text-red-400',
+      bg: 'bg-red-400/10 border-red-400/25',
+      text: 'text-red-300',
       desc: 'This content has significant indicators of AI generation. Recommend thorough manual review and potential rewrite.',
     },
     medium: {
       color: 'yellow',
       label: 'Moderate AI Risk',
       icon: AlertTriangle,
-      bg: 'bg-yellow-500/10 border-yellow-500/30',
-      text: 'text-yellow-400',
+      bg: 'bg-yellow-400/10 border-yellow-400/25',
+      text: 'text-yellow-300',
       desc: 'Some sections show AI-like patterns. Review flagged paragraphs and consider targeted edits.',
     },
     low: {
       color: 'green',
       label: 'Low AI Risk',
       icon: CheckCircle,
-      bg: 'bg-green-500/10 border-green-500/30',
-      text: 'text-green-400',
+      bg: 'bg-green-400/10 border-green-400/25',
+      text: 'text-green-300',
       desc: 'Content appears predominantly human-written. Minor patterns detected are within normal range.',
     },
   };
@@ -159,11 +159,11 @@ export default async function ArticleDetailPage({
       </Link>
 
       {/* Article Header */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-100">
+              <h1 className="text-2xl font-bold text-slate-200">
                 {article.title}
               </h1>
               <StatusBadge status={article.status} />
@@ -207,7 +207,7 @@ export default async function ArticleDetailPage({
       {scan && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {/* AI Detection */}
-          <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+          <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/60 p-6">
             {aiPending ? (
               <>
                 <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-slate-600">
@@ -240,7 +240,7 @@ export default async function ArticleDetailPage({
                   </p>
                   {aiDiff !== null && (
                     <p className={`mt-0.5 text-[10px] font-medium ${
-                      aiDiff > 0 ? 'text-red-400' : 'text-green-400'
+                      aiDiff > 0 ? 'text-red-300' : 'text-green-300'
                     }`}>
                       {aiDiff > 0 ? '↑' : '↓'} {Math.abs(aiDiff).toFixed(1)}% {aiDiff > 0 ? 'above' : 'below'} avg
                     </p>
@@ -251,7 +251,7 @@ export default async function ArticleDetailPage({
           </div>
 
           {/* Plagiarism / Originality */}
-          <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+          <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/60 p-6">
             <ScoreGauge
               score={100 - scan.plagiarismScore}
               label="Originality"
@@ -265,7 +265,7 @@ export default async function ArticleDetailPage({
               </p>
               {plagDiff !== null && (
                 <p className={`mt-0.5 text-[10px] font-medium ${
-                  plagDiff > 0 ? 'text-red-400' : 'text-green-400'
+                  plagDiff > 0 ? 'text-red-300' : 'text-green-300'
                 }`}>
                   {plagDiff > 0 ? '↑' : '↓'} {Math.abs(plagDiff).toFixed(1)}% {plagDiff > 0 ? 'above' : 'below'} avg
                 </p>
@@ -274,7 +274,7 @@ export default async function ArticleDetailPage({
           </div>
 
           {/* Reading Stats */}
-          <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+          <div className="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/60 p-6">
             <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-slate-600 bg-slate-700/50">
               <BookOpen className="h-6 w-6 text-teal-400" />
             </div>
@@ -320,10 +320,10 @@ export default async function ArticleDetailPage({
           </div>
 
           {/* AI Detection Breakdown */}
-          <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+          <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
             <div className="mb-5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-100">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-200">
                   <BarChart3 className="h-5 w-5 text-teal-500" />
                   AI Detection Breakdown
                 </h2>
@@ -390,23 +390,23 @@ export default async function ArticleDetailPage({
             {/* Legend */}
             <div className="mb-6 flex flex-wrap gap-6 text-sm">
               <div className="flex items-center gap-2">
-                <Bot className="h-4 w-4 text-red-400" />
+                <Bot className="h-4 w-4 text-red-300" />
                 <span className="text-slate-400">
-                  <span className="font-semibold text-red-400">{aiCount}</span> AI-Generated Section{aiCount !== 1 ? 's' : ''}
+                  <span className="font-semibold text-red-300">{aiCount}</span> AI-Generated Section{aiCount !== 1 ? 's' : ''}
                 </span>
               </div>
               {mixedCount > 0 && (
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  <AlertTriangle className="h-4 w-4 text-yellow-300" />
                   <span className="text-slate-400">
-                    <span className="font-semibold text-yellow-400">{mixedCount}</span> Mixed
+                    <span className="font-semibold text-yellow-300">{mixedCount}</span> Mixed
                   </span>
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-green-400" />
+                <User className="h-4 w-4 text-green-300" />
                 <span className="text-slate-400">
-                  <span className="font-semibold text-green-400">{humanCount}</span> Human-Written Section{humanCount !== 1 ? 's' : ''}
+                  <span className="font-semibold text-green-300">{humanCount}</span> Human-Written Section{humanCount !== 1 ? 's' : ''}
                 </span>
               </div>
             </div>
@@ -424,10 +424,10 @@ export default async function ArticleDetailPage({
                     key={para.id}
                     className={`rounded-lg border p-4 ${
                       isAi
-                        ? 'border-red-500/30 bg-red-500/5'
+                        ? 'border-red-400/25 bg-red-500/5'
                         : isMixed
-                        ? 'border-yellow-500/30 bg-yellow-500/5'
-                        : 'border-green-500/30 bg-green-500/5'
+                        ? 'border-yellow-400/25 bg-yellow-500/5'
+                        : 'border-green-400/25 bg-green-500/5'
                     }`}
                   >
                     {/* Header row */}
@@ -436,10 +436,10 @@ export default async function ArticleDetailPage({
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                             isAi
-                              ? 'bg-red-500/20 text-red-400'
+                              ? 'bg-red-500/20 text-red-300'
                               : isMixed
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-green-500/20 text-green-400'
+                              ? 'bg-yellow-500/20 text-yellow-300'
+                              : 'bg-green-500/20 text-green-300'
                           }`}
                         >
                           {isAi ? (
@@ -472,7 +472,7 @@ export default async function ArticleDetailPage({
                         </div>
                         <span
                           className={`text-xs font-medium tabular-nums ${
-                            isAi ? 'text-red-400' : isMixed ? 'text-yellow-400' : 'text-green-400'
+                            isAi ? 'text-red-300' : isMixed ? 'text-yellow-300' : 'text-green-300'
                           }`}
                         >
                           {prob.toFixed(0)}% AI
@@ -502,8 +502,8 @@ export default async function ArticleDetailPage({
 
           {/* AI Pattern Analysis (if explain data available) */}
           {explainPatterns?.statistics && (
-            <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-100">
+            <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-200">
                 <Bot className="h-5 w-5 text-teal-500" />
                 AI Pattern Analysis
               </h2>
@@ -534,9 +534,9 @@ export default async function ArticleDetailPage({
                         </code>
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
                           isHighRatio
-                            ? 'bg-red-500/20 text-red-400'
+                            ? 'bg-red-500/20 text-red-300'
                             : isMedRatio
-                            ? 'bg-yellow-500/20 text-yellow-400'
+                            ? 'bg-yellow-500/20 text-yellow-300'
                             : 'bg-slate-600/30 text-slate-400'
                         }`}>
                           {ratio.toFixed(1)}× more likely AI
@@ -595,8 +595,8 @@ export default async function ArticleDetailPage({
 
       {/* Plagiarism Sources — Internet */}
       {internetSources.length > 0 && (
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-          <h2 className="mb-4 text-lg font-semibold text-slate-100">
+        <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+          <h2 className="mb-4 text-lg font-semibold text-slate-200">
             Internet Sources ({internetSources.length})
           </h2>
           <div className="space-y-2">
@@ -625,9 +625,9 @@ export default async function ArticleDetailPage({
                   <span
                     className={`text-sm font-semibold ${
                       source.percentage > 10
-                        ? 'text-red-400'
+                        ? 'text-red-300'
                         : source.percentage > 5
-                        ? 'text-yellow-400'
+                        ? 'text-yellow-300'
                         : 'text-slate-300'
                     }`}
                   >
@@ -645,8 +645,8 @@ export default async function ArticleDetailPage({
 
       {/* Plagiarism Sources — Internal Database */}
       {databaseSources.length > 0 && (
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-          <h2 className="mb-4 text-lg font-semibold text-slate-100">
+        <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
+          <h2 className="mb-4 text-lg font-semibold text-slate-200">
             Internal Database Matches ({databaseSources.length})
           </h2>
           <p className="mb-3 text-xs text-slate-500">
@@ -683,7 +683,7 @@ export default async function ArticleDetailPage({
       {/* No sources but plagiarism score is 0 */}
       {scan && scan.sources.length === 0 && scan.plagiarismScore === 0 && (
         <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-6 text-center">
-          <p className="text-sm text-green-400">
+          <p className="text-sm text-green-300">
             ✅ No plagiarism sources detected — this content appears to be original.
           </p>
         </div>
