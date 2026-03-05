@@ -35,7 +35,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, titlePrefix, website, brandVoiceNotes, doctors, services, bannedPhrases, styleRules } = body;
+    const { name, titlePrefix, website, brandVoiceNotes, sourceFolderId, doctors, services, bannedPhrases, styleRules } = body;
 
     if (!name || !titlePrefix) {
       return NextResponse.json(
@@ -59,6 +59,7 @@ export async function PUT(
           titlePrefix,
           website: website || null,
           brandVoiceNotes: brandVoiceNotes || null,
+          sourceFolderId: sourceFolderId || null,
           doctors: {
             create: (doctors || []).map((d: any) => ({
               fullName: d.fullName,

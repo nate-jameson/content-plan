@@ -10,6 +10,10 @@ export async function GET() {
         services: true,
         bannedPhrases: true,
         styleRules: true,
+        websiteChanges: {
+          where: { status: 'pending' },
+          orderBy: { detectedAt: 'desc' },
+        },
       },
     });
     return NextResponse.json(practices);
@@ -22,7 +26,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, titlePrefix, website, brandVoiceNotes, doctors, services, bannedPhrases, styleRules } = body;
+    const { name, titlePrefix, website, brandVoiceNotes, sourceFolderId, doctors, services, bannedPhrases, styleRules } = body;
 
     if (!name || !titlePrefix) {
       return NextResponse.json(
@@ -37,6 +41,7 @@ export async function POST(request: NextRequest) {
         titlePrefix,
         website: website || null,
         brandVoiceNotes: brandVoiceNotes || null,
+        sourceFolderId: sourceFolderId || null,
         doctors: {
           create: (doctors || []).map((d: any) => ({
             fullName: d.fullName,

@@ -177,13 +177,44 @@ model Practice {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
+  // Source documents for auto-extraction
+  sourceFolderId  String?  @map("source_folder_id")  // Google Drive folder with project docs
+
+  // Website monitoring
+  lastWebsiteCheck  DateTime?  @map("last_website_check")
+  websiteSnapshot   Json?      @map("website_snapshot")  // Last scraped data for comparison
+
   doctors       PracticeDoctor[]
   services      PracticeService[]
   bannedPhrases BannedPhrase[]
   styleRules    StyleRule[]
   editorialIssues EditorialIssue[]
+  websiteChanges  WebsiteChange[]
 
   @@map("practices")
+}
+
+// ============================================================
+// WEBSITE CHANGE TRACKING
+// ============================================================
+model WebsiteChange {
+  id          String   @id @default(cuid())
+  practiceId  String   @map("practice_id")
+  practice    Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  changeType  String   @map("change_type")     // "doctor_added", "doctor_removed", "service_added", "service_removed", "hours_changed", "team_changed"
+  field       String                            // Which field changed
+  oldValue    String?  @db.Text @map("old_value")
+  newValue    String?  @db.Text @map("new_value")
+  severity    String   @default("info")         // "error" | "warning" | "info"
+
+  status      String   @default("pending")      // "pending" | "acknowledged" | "dismissed"
+  resolvedAt  DateTime? @map("resolved_at")
+
+  detectedAt  DateTime @default(now()) @map("detected_at")
+
+  @@index([practiceId, status])
+  @@map("website_changes")
 }
 
 model PracticeDoctor {

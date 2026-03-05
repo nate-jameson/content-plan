@@ -15,6 +15,12 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Sparkles,
+  Search,
+  AlertTriangle,
+  Check,
+  Clock,
+  FolderOpen,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────
@@ -42,17 +48,31 @@ interface StyleRule {
   category: string;
 }
 
+interface WebsiteChange {
+  id: string;
+  changeType: string;
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  severity: string;
+  status: string;
+  detectedAt: string;
+}
+
 interface Practice {
   id: string;
   name: string;
   titlePrefix: string;
   website: string | null;
   brandVoiceNotes: string | null;
+  sourceFolderId: string | null;
+  lastWebsiteCheck: string | null;
   isActive: boolean;
   doctors: Doctor[];
   services: Service[];
   bannedPhrases: BannedPhrase[];
   styleRules: StyleRule[];
+  websiteChanges?: WebsiteChange[];
 }
 
 // ── Defaults ───────────────────────────────────────────────
@@ -67,11 +87,46 @@ const emptyForm = () => ({
   titlePrefix: '',
   website: '',
   brandVoiceNotes: '',
+  sourceFolderId: '',
   doctors: [] as Doctor[],
   services: [] as Service[],
   bannedPhrases: [] as BannedPhrase[],
   styleRules: [] as StyleRule[],
 });
+
+// ── Helpers ────────────────────────────────────────────────
+
+function parseFolderId(value: string): string {
+  const match = value.match(/folders\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : value.trim();
+}
+
+function changeTypeLabel(changeType: string): string {
+  const labels: Record<string, string> = {
+    doctor_added: 'New doctor/team member found',
+    doctor_removed: 'Doctor/team member may have left',
+    service_added: 'New service detected',
+    service_removed: 'Service may have been removed',
+    hours_changed: 'Office hours changed',
+    team_changed: 'Team information changed',
+    contact_changed: 'Contact info changed',
+    other: 'Other change detected',
+  };
+  return labels[changeType] || changeType;
+}
+
+function changeTypeIcon(changeType: string) {
+  if (changeType.includes('doctor') || changeType.includes('team')) return UserRound;
+  if (changeType.includes('service')) return Stethoscope;
+  if (changeType.includes('contact') || changeType.includes('hours')) return Clock;
+  return AlertTriangle;
+}
+
+function severityColor(severity: string) {
+  if (severity === 'error') return 'text-red-400';
+  if (severity === 'warning') return 'text-amber-400';
+  return 'text-blue-400';
+}
 
 // ── Main Page ──────────────────────────────────────────────
 
@@ -84,6 +139,9 @@ export default function PracticesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState<string | null>(null);
+  const [checking, setChecking] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const fetchPractices = useCallback(async () => {
     try {
@@ -101,6 +159,14 @@ export default function PracticesPage() {
 
   useEffect(() => { fetchPractices(); }, [fetchPractices]);
 
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
   function openAdd() {
     setEditingId(null);
     setForm(emptyForm());
@@ -115,6 +181,7 @@ export default function PracticesPage() {
       titlePrefix: p.titlePrefix,
       website: p.website || '',
       brandVoiceNotes: p.brandVoiceNotes || '',
+      sourceFolderId: p.sourceFolderId || '',
       doctors: p.doctors.map((d) => ({ fullName: d.fullName, preferredFormat: d.preferredFormat, role: d.role || 'Dentist' })),
       services: p.services.map((s) => ({ serviceName: s.serviceName, isOffered: s.isOffered })),
       bannedPhrases: p.bannedPhrases.map((bp) => ({ phrase: bp.phrase, suggestedAlt: bp.suggestedAlt || '', reason: bp.reason || '', severity: bp.severity })),
@@ -134,6 +201,7 @@ export default function PracticesPage() {
 
     const payload = {
       ...form,
+      sourceFolderId: form.sourceFolderId ? parseFolderId(form.sourceFolderId) : '',
       doctors: form.doctors.filter((d) => d.fullName.trim()),
       services: form.services.filter((s) => s.serviceName.trim()),
       bannedPhrases: form.bannedPhrases.filter((bp) => bp.phrase.trim()),
@@ -172,6 +240,102 @@ export default function PracticesPage() {
     }
   }
 
+  async function handleExtract(p: Practice) {
+    setExtracting(p.id);
+    try {
+      const res = await fetch(`/api/practices/${p.id}/extract`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast(`❌ Extract failed: ${data.error}`);
+        return;
+      }
+      const ext = data.extracted;
+      // Pre-fill form with extracted data and open modal
+      setEditingId(p.id);
+      setForm({
+        name: ext.name || p.name,
+        titlePrefix: ext.titlePrefix || p.titlePrefix,
+        website: ext.website || p.website || '',
+        brandVoiceNotes: ext.brandVoiceNotes || p.brandVoiceNotes || '',
+        sourceFolderId: p.sourceFolderId || '',
+        doctors: (ext.doctors || []).map((d: any) => ({
+          fullName: d.fullName || '',
+          preferredFormat: d.preferredFormat || '',
+          role: d.role || 'Dentist',
+        })),
+        services: (ext.services || []).map((s: any) => ({
+          serviceName: s.serviceName || '',
+          isOffered: s.isOffered !== false,
+        })),
+        bannedPhrases: (ext.bannedPhrases || []).map((bp: any) => ({
+          phrase: bp.phrase || '',
+          suggestedAlt: bp.suggestedAlt || '',
+          reason: bp.reason || '',
+          severity: bp.severity || 'warning',
+        })),
+        styleRules: (ext.styleRules || []).map((sr: any) => ({
+          rule: sr.rule || '',
+          category: sr.category || 'general',
+        })),
+      });
+      setError('');
+      setShowModal(true);
+      setToast(`✅ Extracted from ${data.docsProcessed} documents — review and save below`);
+    } catch {
+      setToast('❌ Network error during extraction');
+    } finally {
+      setExtracting(null);
+    }
+  }
+
+  async function handleCheckWebsite(p: Practice) {
+    setChecking(p.id);
+    try {
+      const res = await fetch(`/api/practices/${p.id}/check-website`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast(`❌ Website check failed: ${data.error}`);
+        return;
+      }
+      fetchPractices();
+      setToast(
+        data.changesFound > 0
+          ? `⚠️ ${data.changesFound} website change${data.changesFound > 1 ? 's' : ''} detected for ${p.name}`
+          : `✅ No changes detected for ${p.name}`
+      );
+    } catch {
+      setToast('❌ Network error during website check');
+    } finally {
+      setChecking(null);
+    }
+  }
+
+  async function handleAcknowledgeChange(changeId: string) {
+    try {
+      await fetch(`/api/practices/changes/${changeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'acknowledged' }),
+      });
+      fetchPractices();
+    } catch {
+      console.error('Failed to acknowledge change');
+    }
+  }
+
+  async function handleDismissChange(changeId: string) {
+    try {
+      await fetch(`/api/practices/changes/${changeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'dismissed' }),
+      });
+      fetchPractices();
+    } catch {
+      console.error('Failed to dismiss change');
+    }
+  }
+
   // ── Dynamic list helpers ─────────────────────────────────
 
   function updateList<T>(key: keyof typeof form, index: number, field: keyof T, value: any) {
@@ -206,6 +370,13 @@ export default function PracticesPage() {
 
   return (
     <div className="space-y-8">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-[60] max-w-md rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-slate-200 shadow-lg">
+          {toast}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -233,6 +404,7 @@ export default function PracticesPage() {
         <div className="space-y-3">
           {practices.map((p) => {
             const isExpanded = expandedId === p.id;
+            const pendingChanges = p.websiteChanges?.filter(c => c.status === 'pending') || [];
             return (
               <div
                 key={p.id}
@@ -262,6 +434,12 @@ export default function PracticesPage() {
                     <Badge icon={Stethoscope} count={p.services.length} label="services" />
                     <Badge icon={Ban} count={p.bannedPhrases.length} label="banned" />
                     <Badge icon={BookOpen} count={p.styleRules.length} label="rules" />
+                    {pendingChanges.length > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/20 px-2 py-1 text-xs font-medium text-amber-400" title={`${pendingChanges.length} pending website changes`}>
+                        <AlertTriangle className="h-3 w-3" />
+                        {pendingChanges.length}
+                      </span>
+                    )}
                     {isExpanded ? (
                       <ChevronDown className="h-4 w-4 text-slate-500" />
                     ) : (
@@ -273,6 +451,63 @@ export default function PracticesPage() {
                 {/* Expanded detail */}
                 {isExpanded && (
                   <div className="border-t border-slate-700/50 px-5 pb-5 pt-4 space-y-4">
+                    {/* Website Changes Alert */}
+                    {pendingChanges.length > 0 && (
+                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-400" />
+                          <h4 className="text-sm font-semibold text-amber-300">
+                            {pendingChanges.length} Website Change{pendingChanges.length > 1 ? 's' : ''} Detected
+                          </h4>
+                        </div>
+                        <div className="space-y-2">
+                          {pendingChanges.map((change) => {
+                            const Icon = changeTypeIcon(change.changeType);
+                            return (
+                              <div key={change.id} className="flex items-start justify-between gap-3 rounded-md bg-slate-800/60 px-3 py-2">
+                                <div className="flex items-start gap-2 min-w-0">
+                                  <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${severityColor(change.severity)}`} />
+                                  <div className="text-xs text-slate-300">
+                                    <span className="font-medium">{changeTypeLabel(change.changeType)}</span>
+                                    {change.oldValue && <span className="text-slate-500"> — was: &ldquo;{change.oldValue}&rdquo;</span>}
+                                    {change.newValue && <span className="text-slate-400"> → &ldquo;{change.newValue}&rdquo;</span>}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    onClick={() => handleAcknowledgeChange(change.id)}
+                                    className="inline-flex items-center gap-1 rounded bg-slate-700 px-2 py-1 text-[10px] font-medium text-slate-300 hover:bg-slate-600"
+                                    title="Acknowledge"
+                                  >
+                                    <Check className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDismissChange(change.id)}
+                                    className="inline-flex items-center gap-1 rounded bg-slate-700 px-2 py-1 text-[10px] font-medium text-slate-400 hover:bg-slate-600"
+                                    title="Dismiss"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => openEdit(p)}
+                                    className="inline-flex items-center gap-1 rounded bg-indigo-600/30 px-2 py-1 text-[10px] font-medium text-indigo-300 hover:bg-indigo-600/50"
+                                    title="Update Guide"
+                                  >
+                                    <Edit2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {p.lastWebsiteCheck && (
+                          <p className="text-[10px] text-slate-500">
+                            Last checked: {new Date(p.lastWebsiteCheck).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {p.brandVoiceNotes && (
                       <div>
                         <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Brand Voice</h4>
@@ -349,7 +584,23 @@ export default function PracticesPage() {
                       </div>
                     )}
 
-                    <div className="flex gap-2 pt-2">
+                    {/* Source folder info */}
+                    {p.sourceFolderId && (
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <FolderOpen className="h-3.5 w-3.5" />
+                        <span>Source folder: {p.sourceFolderId.slice(0, 20)}...</span>
+                      </div>
+                    )}
+
+                    {/* Last website check info (when no pending changes) */}
+                    {pendingChanges.length === 0 && p.lastWebsiteCheck && (
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>Last website check: {new Date(p.lastWebsiteCheck).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-2">
                       <button
                         onClick={() => openEdit(p)}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-600 transition-colors"
@@ -357,6 +608,37 @@ export default function PracticesPage() {
                         <Edit2 className="h-3.5 w-3.5" />
                         Edit
                       </button>
+
+                      {p.sourceFolderId && (
+                        <button
+                          onClick={() => handleExtract(p)}
+                          disabled={extracting === p.id}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600/20 border border-teal-500/30 px-3 py-1.5 text-xs font-medium text-teal-300 hover:bg-teal-600/30 disabled:opacity-50 transition-colors"
+                        >
+                          {extracting === p.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5" />
+                          )}
+                          {extracting === p.id ? 'Extracting...' : 'Auto-Extract from Docs'}
+                        </button>
+                      )}
+
+                      {p.website && (
+                        <button
+                          onClick={() => handleCheckWebsite(p)}
+                          disabled={checking === p.id}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 px-3 py-1.5 text-xs font-medium text-blue-300 hover:bg-blue-600/30 disabled:opacity-50 transition-colors"
+                        >
+                          {checking === p.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Search className="h-3.5 w-3.5" />
+                          )}
+                          {checking === p.id ? 'Checking...' : 'Check Website Now'}
+                        </button>
+                      )}
+
                       <button
                         onClick={() => handleDelete(p.id, p.name)}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
@@ -402,6 +684,17 @@ export default function PracticesPage() {
                   <Input label="Title Prefix" value={form.titlePrefix} onChange={(v) => setForm((f) => ({ ...f, titlePrefix: v }))} placeholder="Ada Smile Place" required />
                 </div>
                 <Input label="Website URL" value={form.website} onChange={(v) => setForm((f) => ({ ...f, website: v }))} placeholder="https://adasmileplace.com" />
+                <div>
+                  <Input
+                    label="Google Drive Project Folder"
+                    value={form.sourceFolderId}
+                    onChange={(v) => setForm((f) => ({ ...f, sourceFolderId: v }))}
+                    placeholder="Paste folder URL or ID"
+                  />
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Folder containing content plan, website content, and outline docs
+                  </p>
+                </div>
               </Section>
 
               {/* Brand Voice */}
