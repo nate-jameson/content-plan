@@ -148,7 +148,7 @@ export default async function WriterDetailPage({
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Total Articles" value={writer.totalArticles} />
+        <StatCard label="Total Articles" value={writer.articles.length} />
         <StatCard
           label="Avg AI Score"
           value={`${(writer.avgAiScore * 100).toFixed(0)}%`}
